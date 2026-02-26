@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Localshare — Share Files Instantly</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #222230;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --text: #e8e8f0;
+      --muted: #5a5a72;
+      --success: #00e5a0;
+      --danger: #ff4560;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid Background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 {
+      width: 500px; height: 500px;
+      background: rgba(124,58,237,0.12);
+      top: -150px; right: -100px;
+    }
+    .orb-2 {
+      width: 400px; height: 400px;
+      background: rgba(0,229,255,0.08);
+      bottom: -100px; left: -80px;
+    }
+
+    /* Layout */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 28px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .nav-link {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-link:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 64px 0 48px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--accent);
+      border: 1px solid rgba(0,229,255,0.25);
+      background: rgba(0,229,255,0.05);
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      animation: fadeUp 0.6s 0.1s ease both;
+      margin-bottom: 16px;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 420px;
+      margin: 0 auto 48px;
+      animation: fadeUp 0.6s 0.2s ease both;
+      font-weight: 400;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Upload Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      animation: fadeUp 0.6s 0.3s ease both;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,229,255,0.3), transparent);
+    }
+
+    /* Drop Zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      margin-bottom: 28px;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0,229,255,0.04);
+    }
+
+    .drop-zone.drag-over {
+      transform: scale(1.01);
+    }
+
+    .drop-icon {
+      width: 56px; height: 56px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(124,58,237,0.15));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      transition: transform 0.2s;
+    }
+
+    .drop-zone:hover .drop-icon {
+      transform: translateY(-3px);
+    }
+
+    .drop-zone h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .drop-zone p {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .drop-zone p span {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    #fileInput { display: none; }
+
+    /* File List */
+    .file-list {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .file-list.has-files { display: flex; }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      animation: fadeUp 0.2s ease both;
+    }
+
+    .file-item .file-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .file-item .file-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .file-item .file-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-item .file-size {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .file-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 2px;
+      border-radius: 4px;
+      transition: color 0.2s;
+      flex-shrink: 0;
+    }
+    .file-remove:hover { color: var(--danger); }
+
+    /* Settings Row */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .settings-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .duration-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .duration-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .duration-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .duration-btn.active {
+      background: rgba(0,229,255,0.1);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Upload Button */
+    .upload-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .upload-btn:hover::before { opacity: 1; }
+    .upload-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(0,229,255,0.25); }
+    .upload-btn:active { transform: translateY(0); }
+    .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Progress */
+    .progress-wrap {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .progress-wrap.visible { display: block; }
+
+    .progress-bar-bg {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .progress-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    /* Result */
+    .result-card {
+      display: none;
+      margin-top: 24px;
+      background: rgba(0,229,160,0.05);
+      border: 1px solid rgba(0,229,160,0.2);
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .result-card.visible { display: block; }
+
+    .result-card .tick {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+    }
+
+    .result-card h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--success);
+    }
+
+    .result-card p {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .code-display {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .code-display .code-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 2rem;
+      font-weight: 500;
+      letter-spacing: 0.3em;
+      color: var(--accent);
+    }
+
+    .link-display {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .link-display .link-url {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    .copy-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 14px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .copy-btn.copied {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .new-upload-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .new-upload-btn:hover {
+      color: var(--text);
+      border-color: var(--text);
+    }
+
+    /* Access Quick Panel */
+    .access-panel {
+      margin-top: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      animation: fadeUp 0.6s 0.4s ease both;
+      text-align: center;
+    }
+
+    .access-panel h4 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .access-panel p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .code-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .code-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-family: 'DM Mono', monospace;
+      font-size: 1.1rem;
+      color: var(--text);
+      text-align: center;
+      letter-spacing: 0.2em;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    .code-input:focus {
+      border-color: var(--accent);
+    }
+
+    .code-input::placeholder {
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .access-go-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .access-go-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0,229,255,0.2);
+    }
+
+    /* Features */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 24px 0 48px;
+      animation: fadeUp 0.6s 0.5s ease both;
+    }
+
+    .feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 16px;
+      text-align: center;
+    }
+
+    .feature .f-icon {
+      font-size: 1.6rem;
+      margin-bottom: 10px;
+    }
+
+    .feature h5 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .feature p {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 520px) {
+      .features { grid-template-columns: 1fr; }
+      .settings-row { flex-direction: column; align-items: flex-start; }
+      h1 { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="container">
+    <header>
+      <a href="/" class="logo">
+        <div class="logo-icon">⚡</div>
+        Localshare
+      </a>
+      <a href="/access.html" class="nav-link">Access Files →</a>
+    </header>
+
+    <section class="hero">
+      <div class="badge">No login required · Works on any device</div>
+      <h1>Share files with<br><span>just a code</span></h1>
+      <p class="subtitle">Perfect for college computer labs. Upload your files, share the 6-digit code, and anyone can download instantly — no Google, no WhatsApp needed.</p>
+    </section>
+
+    <!-- Upload Card -->
+    <div class="card" id="uploadCard">
+      <input type="file" id="fileInput" multiple />
+
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">📁</div>
+        <h3>Drop files here</h3>
+        <p>or <span onclick="document.getElementById('fileInput').click()">browse your device</span></p>
+      </div>
+
+      <div class="file-list" id="fileList"></div>
+
+      <div class="settings-row">
+        <span class="settings-label">Expires in:</span>
+        <div class="duration-group">
+          <button class="duration-btn active" data-value="24h">24 hours</button>
+          <button class="duration-btn" data-value="3d">3 days</button>
+          <button class="duration-btn" data-value="7d">7 days</button>
+        </div>
+      </div>
+
+      <button class="upload-btn" id="uploadBtn">
+        ⚡ Generate Share Link
+      </button>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-label" id="progressLabel">Uploading...</div>
+      </div>
+
+      <div class="result-card" id="resultCard">
+        <div class="tick">✅</div>
+        <h3>Files shared successfully!</h3>
+        <p>Share this code or link — files will be available until expiry</p>
+
+        <div class="code-display">
+          <span class="code-text" id="shareCode">------</span>
+        </div>
+
+        <div class="link-display">
+          <span class="link-url" id="shareUrl"></span>
+          <button class="copy-btn" id="copyBtn">Copy</button>
+        </div>
+
+        <button class="new-upload-btn" onclick="resetUpload()">Upload more files</button>
+      </div>
+    </div>
+
+    <!-- Quick Access Panel -->
+    <div class="access-panel">
+      <h4>Already have a code?</h4>
+      <p>Enter the 6-digit code to access shared files</p>
+      <div class="code-input-row">
+        <input type="text" class="code-input" id="codeInput" placeholder="000000" maxlength="6" inputmode="numeric"/>
+        <button class="access-go-btn" onclick="goToCode()">Access →</button>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature">
+        <div class="f-icon">🔒</div>
+        <h5>No Login</h5>
+        <p>Zero accounts. Works on any public computer.</p>
+      </div>
+      <div class="feature">
+        <div class="f-icon">⚡</div>
+        <h5>Instant Share</h5>
+        <p>Get a 6-digit code in seconds.</p>
+      </div>
+      <div class="feature">
+        <div class="f-icon">🗑️</div>
+        <h5>Auto-Delete</h5>
+        <p>Files vanish after your chosen expiry.</p>
+      </div>
+    </div>
+
+    <footer>
+      Localshare — Fast. Temporary. No account needed.
+    </footer>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileListEl = document.getElementById('fileList');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+    const resultCard = document.getElementById('resultCard');
+    const codeInput = document.getElementById('codeInput');
+
+    let selectedFiles = [];
+    let selectedDuration = '24h';
+
+    // Duration buttons
+    document.querySelectorAll('.duration-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedDuration = btn.dataset.value;
+      });
+    });
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      addFiles([...e.dataTransfer.files]);
+    });
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+      addFiles([...fileInput.files]);
+      fileInput.value = '';
+    });
+
+    function addFiles(files) {
+      files.forEach(f => {
+        if (!selectedFiles.find(sf => sf.name === f.name && sf.size === f.size)) {
+          selectedFiles.push(f);
+        }
+      });
+      renderFileList();
+    }
+
+    function renderFileList() {
+      fileListEl.innerHTML = '';
+      if (selectedFiles.length > 0) {
+        fileListEl.classList.add('has-files');
+        selectedFiles.forEach((file, idx) => {
+          const item = document.createElement('div');
+          item.className = 'file-item';
+          item.innerHTML = `
+            <span class="file-icon">${getFileIcon(file.name)}</span>
+            <div class="file-info">
+              <div class="file-name">${file.name}</div>
+              <div class="file-size">${formatBytes(file.size)}</div>
+            </div>
+            <button class="file-remove" onclick="removeFile(${idx})">✕</button>
+          `;
+          fileListEl.appendChild(item);
+        });
+      } else {
+        fileListEl.classList.remove('has-files');
+      }
+    }
+
+    function removeFile(idx) {
+      selectedFiles.splice(idx, 1);
+      renderFileList();
+    }
+
+    function getFileIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      const map = { pdf: '📄', jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', mp4: '🎬', mov: '🎬', mp3: '🎵', wav: '🎵', zip: '🗜️', rar: '🗜️', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊', ppt: '📑', pptx: '📑', txt: '📃', js: '💻', html: '🌐', css: '🎨', py: '🐍' };
+      return map[ext] || '📁';
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // Upload
+    uploadBtn.addEventListener('click', async () => {
+      if (selectedFiles.length === 0) {
+        dropZone.style.borderColor = 'var(--danger)';
+        setTimeout(() => dropZone.style.borderColor = '', 1000);
+        return;
+      }
+
+      const formData = new FormData();
+      selectedFiles.forEach(f => formData.append('files', f));
+      formData.append('duration', selectedDuration);
+
+      uploadBtn.disabled = true;
+      progressWrap.classList.add('visible');
+      resultCard.classList.remove('visible');
+
+      try {
+        // Animate progress while uploading
+        let prog = 0;
+        const interval = setInterval(() => {
+          prog = Math.min(prog + Math.random() * 8, 85);
+          progressFill.style.width = prog + '%';
+          progressLabel.textContent = `Uploading... ${Math.round(prog)}%`;
+        }, 150);
+
+        const res = await fetch('/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        clearInterval(interval);
+        progressFill.style.width = '100%';
+        progressLabel.textContent = 'Done!';
+
+        if (data.url) {
+          const code = data.url.split('/access/').pop();
+          document.getElementById('shareCode').textContent = code;
+          document.getElementById('shareUrl').textContent = data.url;
+
+          const copyBtn = document.getElementById('copyBtn');
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(data.url);
+            copyBtn.textContent = 'Copied!';
+            copyBtn.classList.add('copied');
+            setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 2000);
+          };
+
+          setTimeout(() => {
+            progressWrap.classList.remove('visible');
+            resultCard.classList.add('visible');
+          }, 500);
+        } else {
+          alert('Upload failed: ' + (data.error || 'Unknown error'));
+          progressWrap.classList.remove('visible');
+          uploadBtn.disabled = false;
+        }
+      } catch (err) {
+        alert('Upload error: ' + err.message);
+        progressWrap.classList.remove('visible');
+        uploadBtn.disabled = false;
+      }
+    });
+
+    function resetUpload() {
+      selectedFiles = [];
+      renderFileList();
+      resultCard.classList.remove('visible');
+      progressWrap.classList.remove('visible');
+      progressFill.style.width = '0%';
+      uploadBtn.disabled = false;
+    }
+
+    // Code input — numbers only
+    codeInput.addEventListener('input', () => {
+      codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+    });
+
+    codeInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') goToCode();
+    });
+
+    function goToCode() {
+      const code = codeInput.value.trim();
+      if (code.length !== 6) {
+        codeInput.style.borderColor = 'var(--danger)';
+        setTimeout(() => codeInput.style.borderColor = '', 1000);
+        return;
+      }
+      window.location.href = '/access/' + code;
+    }
+  </script>
+</body>
+</html>
