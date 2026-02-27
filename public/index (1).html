@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Localshare – Temporary File Sharing Without Login</title>
+  <meta name="description" content="Localshare is a fast and secure temporary file sharing website. Share files using a code without login. Files auto-delete after expiry.">
+  <meta name="keywords" content="temporary file sharing, share files without login, file sharing for students, college file sharing">
+  <meta name="robots" content="index, follow">
+  <meta property="og:title" content="Localshare – Temporary File Sharing Without Login">
+  <meta property="og:description" content="Share files instantly using a 6-digit code. No login needed. Perfect for college labs.">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo-wrap">
+      <img src="logo.svg" alt="Localshare" width="36" height="36">
+      <h1>Localshare</h1>
+    </div>
+    <p>Secure Temporary File Sharing — No Login Required</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- SHARE FILES CARD -->
+  <div class="card">
+    <h2>📤 Share Files</h2>
+
+    <!-- Drop zone — clicking this opens file picker -->
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">📁</div>
+      <p class="drop-text">Drag &amp; drop files here</p>
+      <p class="drop-sub">or click anywhere to browse</p>
+      <!-- Hidden real input -->
+      <input type="file" id="fileInput" multiple style="display:none">
+    </div>
+
+    <!-- Selected files list -->
+    <ul id="selectedFiles"></ul>
+
+    <label class="field-label" for="duration">Access Duration</label>
+    <select id="duration">
+      <option value="24h">24 Hours</option>
+      <option value="3d">3 Days</option>
+      <option value="7d">7 Days</option>
+    </select>
+
+    <!-- ✅ id="generateBtn" — NO onclick here, handled in script.js -->
+    <button id="generateBtn">⚡ Generate Link</button>
+
+    <!-- Result box (hidden until link generated) -->
+    <div id="resultBox" class="result-box" style="display:none;">
+      <p class="result-label">✅ Share this link:</p>
+      <div class="url-row">
+        <span id="generatedUrl"></span>
+        <!-- ✅ id="copyBtn" — NO onclick here -->
+        <button id="copyBtn">Copy</button>
+      </div>
+      <p class="code-hint">Code: <strong id="generatedCode"></strong></p>
+    </div>
+  </div>
+
+  <!-- ACCESS FILES CARD -->
+  <div class="card">
+    <h2>📥 Access Files</h2>
+    <p class="card-sub">Paste the share link or enter the 6-digit code</p>
+
+    <input type="text" id="accessInput" placeholder="Paste link or enter code…" autocomplete="off">
+
+    <!-- ✅ onclick here is fine since accessFiles is a global function -->
+    <button onclick="accessFiles()">🔍 Access Files</button>
+
+    <div id="fileList"></div>
+  </div>
+
+</div>
+
+<!-- ABOUT SECTION -->
+<section class="about-section">
+  <div class="about-inner">
+    <div class="about-block">
+      <h2>About Localshare</h2>
+      <p>A simple and secure temporary file sharing site. Upload files, get a short code, share it — files download instantly with no account needed. All files auto-delete after expiry.</p>
+    </div>
+    <div class="about-block">
+      <h2>Why Localshare?</h2>
+      <p>No registration, no email, no permanent storage. Fast, lightweight and privacy-focused. Files are never reused or analyzed.</p>
+    </div>
+    <div class="about-block">
+      <h2>Who Is It For?</h2>
+      <p>Perfect for students in college computer labs, office workers, or anyone who needs to transfer files quickly on a shared or public device.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="footer-container">
+    <div class="footer-section">
+      <h3>Localshare</h3>
+      <p>Fast and secure temporary file sharing. Share using a link — no login. Files expire automatically.</p>
+    </div>
+    <div class="footer-section">
+      <h3>Features</h3>
+      <ul>
+        <li>✔ No login required</li>
+        <li>✔ Time-limited access</li>
+        <li>✔ Secure file sharing</li>
+        <li>✔ Works on any device</li>
+        <li>✔ Auto file deletion</li>
+      </ul>
+    </div>
+    <div class="footer-section">
+      <h3>Use Cases</h3>
+      <ul>
+        <li>Students &amp; colleges</li>
+        <li>Office file sharing</li>
+        <li>Temporary transfers</li>
+        <li>Public computer labs</li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    © 2026 Localshare · Temporary File Sharing Without Login ·
+    <a href="mailto:bitsresourcesr22@gmail.com">bitsresourcesr22@gmail.com</a>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
