@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Access Files — Localshare</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #222230;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --text: #e8e8f0;
+      --muted: #5a5a72;
+      --success: #00e5a0;
+      --danger: #ff4560;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+
+    .orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; }
+    .orb-1 { width: 450px; height: 450px; background: rgba(124,58,237,0.1); top: -100px; right: -80px; }
+    .orb-2 { width: 350px; height: 350px; background: rgba(0,229,255,0.07); bottom: -80px; left: -60px; }
+
+    .container { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; padding: 0 24px; }
+
+    header {
+      padding: 28px 0 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--text); text-decoration: none;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .nav-link {
+      font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted);
+      text-decoration: none; border: 1px solid var(--border); padding: 8px 16px;
+      border-radius: 6px; transition: all 0.2s;
+    }
+    .nav-link:hover { color: var(--accent); border-color: var(--accent); }
+
+    .main { padding: 56px 0 48px; }
+
+    /* States */
+    .state { text-align: center; padding: 80px 24px; }
+    .state-icon { font-size: 3rem; margin-bottom: 16px; }
+    .state h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+    .state p { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 24px; }
+
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Code header */
+    .code-header {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 24px; margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      animation: fadeUp 0.5s ease both; position: relative; overflow: hidden;
+    }
+    .code-header::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,229,255,0.3), transparent);
+    }
+    .code-meta h3 { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .code-value { font-family: 'DM Mono', monospace; font-size: 1.8rem; font-weight: 500; letter-spacing: 0.25em; color: var(--accent); }
+    .expiry-badge { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .expiry-badge span:first-child { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+    .expiry-badge span:last-child { font-family: 'DM Mono', monospace; font-size: 0.82rem; color: var(--success); }
+
+    .file-count-bar { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); margin-bottom: 12px; padding: 0 4px; animation: fadeUp 0.5s 0.1s ease both; }
+
+    /* File cards */
+    .files-grid { display: flex; flex-direction: column; gap: 10px; animation: fadeUp 0.5s 0.15s ease both; }
+
+    .file-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px 20px; display: flex; align-items: center; gap: 16px;
+      transition: all 0.2s;
+    }
+    .file-card:hover { border-color: rgba(0,229,255,0.3); background: rgba(0,229,255,0.03); transform: translateY(-1px); }
+
+    .fc-icon {
+      width: 48px; height: 48px; flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(0,229,255,0.1), rgba(124,58,237,0.1));
+      border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .fc-info { flex: 1; overflow: hidden; }
+    .fc-name { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+    .fc-meta { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+
+    /* Download button */
+    .dl-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 10px; padding: 10px 20px;
+      font-family: 'Syne', sans-serif; font-size: 0.82rem; font-weight: 700;
+      color: #fff; cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+    }
+    .dl-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,255,0.25); }
+    .dl-btn:active { transform: translateY(0); }
+    .dl-btn.downloading { opacity: 0.7; cursor: wait; }
+
+    /* Download All */
+    .download-all-wrap { margin-top: 20px; animation: fadeUp 0.5s 0.2s ease both; }
+    .download-all-btn {
+      width: 100%; background: transparent; border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px;
+      font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 700;
+      color: var(--text); cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .download-all-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px; margin-top: 24px;
+      font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--muted);
+      text-decoration: none; transition: color 0.2s; animation: fadeUp 0.5s 0.3s ease both;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    .btn-primary {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 10px; padding: 12px 28px;
+      font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 700;
+      color: #fff; cursor: pointer; text-decoration: none; transition: all 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,255,0.25); }
+
+    footer { border-top: 1px solid var(--border); padding: 24px 0; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="container">
+    <header>
+      <a href="/" class="logo">
+        <div class="logo-icon">⚡</div>
+        Localshare
+      </a>
+      <a href="/" class="nav-link">← Share Files</a>
+    </header>
+
+    <div class="main" id="mainContent">
+      <div class="state">
+        <div class="spinner"></div>
+        <p>Fetching your files...</p>
+      </div>
+    </div>
+
+    <footer>Localshare — Fast. Temporary. No account needed.</footer>
+  </div>
+
+  <script>
+    const code = window.location.pathname.split('/access/')[1];
+    const mainContent = document.getElementById('mainContent');
+
+    function getFileIcon(name) {
+      const ext = (name || '').split('.').pop().toLowerCase();
+      const map = {
+        pdf:'📄', jpg:'🖼️', jpeg:'🖼️', png:'🖼️', gif:'🖼️', webp:'🖼️',
+        mp4:'🎬', mov:'🎬', avi:'🎬', mp3:'🎵', wav:'🎵',
+        zip:'🗜️', rar:'🗜️', '7z':'🗜️',
+        doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', ppt:'📑', pptx:'📑',
+        txt:'📃', js:'💻', ts:'💻', html:'🌐', css:'🎨', py:'🐍'
+      };
+      return map[ext] || '📁';
+    }
+
+    function formatBytes(b) {
+      if (!b) return '';
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+      return (b/1048576).toFixed(1) + ' MB';
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.appendChild(document.createTextNode(str));
+      return d.innerHTML;
+    }
+
+    /* ── FORCE DOWNLOAD via our proxy URL ─────────────────────
+       The URL from /api/access already points to /download/:code/:idx
+       which sets Content-Disposition: attachment on the server.
+       We use a hidden <a> click as the most reliable cross-browser method.
+    ──────────────────────────────────────────────────────────── */
+    function forceDownload(url, filename, btn) {
+      // Show loading state on button
+      if (btn) {
+        btn.classList.add('downloading');
+        btn.textContent = '⏳ Downloading...';
+      }
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;  // hint for filename
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Reset button after short delay
+      if (btn) {
+        setTimeout(() => {
+          btn.classList.remove('downloading');
+          btn.textContent = '↓ Download';
+        }, 2000);
+      }
+    }
+
+    async function loadFiles() {
+      if (!code) {
+        showError('No code found', 'This link appears to be invalid.');
+        return;
+      }
+
+      try {
+        const res  = await fetch('/api/access/' + code);
+        const data = await res.json();
+
+        if (data.error) {
+          data.error.includes('expired') ? showExpired() : showError('Invalid Code', data.error);
+          return;
+        }
+
+        showFiles(data.files);
+      } catch (err) {
+        showError('Connection Error', 'Could not reach the server. Please try again.');
+      }
+    }
+
+    function showFiles(files) {
+      // Build HTML
+      mainContent.innerHTML = `
+        <div class="code-header">
+          <div class="code-meta">
+            <h3>Share Code</h3>
+            <div class="code-value">${escapeHtml(code)}</div>
+          </div>
+          <div class="expiry-badge">
+            <span>Status</span>
+            <span>● Active</span>
+          </div>
+        </div>
+
+        <div class="file-count-bar">
+          ${files.length} file${files.length !== 1 ? 's' : ''} ready to download
+        </div>
+
+        <div class="files-grid" id="filesGrid">
+          ${files.map((file, idx) => `
+            <div class="file-card">
+              <div class="fc-icon">${getFileIcon(file.name)}</div>
+              <div class="fc-info">
+                <div class="fc-name">${escapeHtml(file.name)}</div>
+                <div class="fc-meta">${formatBytes(file.size)}</div>
+              </div>
+              <button class="dl-btn" data-url="${escapeHtml(file.url)}" data-name="${escapeHtml(file.name)}" data-idx="${idx}">
+                ↓ Download
+              </button>
+            </div>
+          `).join('')}
+        </div>
+
+        ${files.length > 1 ? `
+        <div class="download-all-wrap">
+          <button class="download-all-btn" id="downloadAllBtn">
+            ↓ Download All Files
+          </button>
+        </div>` : ''}
+
+        <a href="/" class="back-link">← Share your own files</a>
+      `;
+
+      // Attach download button events (NOT inline onclick — avoids escaping issues)
+      document.querySelectorAll('.dl-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          forceDownload(btn.dataset.url, btn.dataset.name, btn);
+        });
+      });
+
+      // Download All button
+      const dlAllBtn = document.getElementById('downloadAllBtn');
+      if (dlAllBtn) {
+        dlAllBtn.addEventListener('click', () => {
+          dlAllBtn.textContent = '⏳ Starting downloads...';
+          files.forEach((file, i) => {
+            setTimeout(() => {
+              forceDownload(file.url, file.name, null);
+              if (i === files.length - 1) {
+                setTimeout(() => { dlAllBtn.textContent = '↓ Download All Files'; }, 1500);
+              }
+            }, i * 600);
+          });
+        });
+      }
+    }
+
+    function showExpired() {
+      mainContent.innerHTML = `
+        <div class="state">
+          <div class="state-icon">⏰</div>
+          <h2>Link Expired</h2>
+          <p>This share link has expired and the files have been deleted.</p>
+          <a href="/" class="btn-primary">Share New Files</a>
+        </div>`;
+    }
+
+    function showError(title, message) {
+      mainContent.innerHTML = `
+        <div class="state">
+          <div class="state-icon">🔍</div>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(message)}</p>
+          <a href="/" class="btn-primary">Go Back Home</a>
+        </div>`;
+    }
+
+    loadFiles();
+  </script>
+</body>
+</html>
