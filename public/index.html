@@ -12,6 +12,106 @@
   <meta property="og:type" content="website">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* IP Locator button */
+    .header-inner { position: relative; }
+    .ip-locator-btn {
+      position: absolute; top: 0; right: 0;
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff; text-decoration: none;
+      font-size: 0.82rem; font-weight: 600;
+      padding: 8px 16px; border-radius: 8px;
+      border: 1.5px solid rgba(255,255,255,0.25);
+      box-shadow: 0 4px 14px rgba(79,70,229,0.45);
+      transition: all 0.2s ease; white-space: nowrap;
+    }
+    .ip-locator-btn:hover {
+      background: linear-gradient(135deg, #6d28d9, #4338ca);
+      box-shadow: 0 6px 20px rgba(79,70,229,0.6);
+      transform: translateY(-1px);
+    }
+    @media (max-width: 600px) {
+      .ip-locator-btn { position: static; margin-top: 12px; display: block; text-align: center; }
+    }
+
+    /* ── UPLOAD AREA ──────────────────────────────────────── */
+    .upload-area {
+      border: 2px dashed #c4b5fd;
+      border-radius: 14px;
+      background: #faf5ff;
+      transition: background 0.2s, border-color 0.2s;
+      overflow: hidden;
+    }
+
+    .upload-area.drag-over {
+      background: #ede9fe;
+      border-color: #7c3aed;
+      border-style: solid;
+    }
+
+    /* Drop zone (top visual area) */
+    .drop-zone {
+      padding: 28px 16px 20px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .drop-icon { font-size: 2.2rem; margin-bottom: 8px; pointer-events: none; }
+    .drop-text { font-size: 0.9rem; color: #555; font-weight: 600; pointer-events: none; }
+    .drop-sub  { font-size: 0.78rem; color: #999; margin-top: 3px; pointer-events: none; }
+
+    /* ✅ VISIBLE browse button — most reliable cross-browser trigger */
+    .browse-btn {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 0 16px 16px;
+      padding: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.88rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      text-align: center;
+    }
+    .browse-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* Shake animation */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+    .upload-area.shake { animation: shake 0.5s ease; border-color: #dc2626; }
+
+    /* Upload progress */
+    .upload-progress {
+      display: none;
+      margin-top: 4px;
+      padding: 10px 14px;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 10px;
+    }
+    .upload-progress.visible { display: block; }
+    .progress-bar-bg {
+      height: 6px; background: #e0e7ff; border-radius: 3px; overflow: hidden; margin-bottom: 6px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    .progress-label { font-size: 0.78rem; color: #6366f1; text-align: center; font-weight: 600; }
+  </style>
 </head>
 <body>
 
@@ -22,53 +122,9 @@
       <h1>Localshare</h1>
     </div>
     <p>Secure Temporary File Sharing — No Login Required</p>
-    <a href="ip_locator.html" target="_blank" class="ip-locator-btn">
-      🌐 IP Address Locator
-    </a>
+    <a href="ip_locator.html" target="_blank" class="ip-locator-btn">🌐 IP Address Locator</a>
   </div>
 </header>
-
-<style>
-  .header-inner {
-    position: relative;
-  }
-  .ip-locator-btn {
-    position: absolute;
-    top: 0;
-    right: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: linear-gradient(135deg, #7c3aed, #4f46e5);
-    color: #fff;
-    text-decoration: none;
-    font-size: 0.82rem;
-    font-weight: 600;
-    padding: 8px 16px;
-    border-radius: 8px;
-    border: 1.5px solid rgba(255,255,255,0.25);
-    box-shadow: 0 4px 14px rgba(79,70,229,0.45);
-    letter-spacing: 0.02em;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-  }
-  .ip-locator-btn:hover {
-    background: linear-gradient(135deg, #6d28d9, #4338ca);
-    box-shadow: 0 6px 20px rgba(79,70,229,0.6);
-    transform: translateY(-1px);
-  }
-  .ip-locator-btn:active {
-    transform: translateY(0);
-  }
-  @media (max-width: 600px) {
-    .ip-locator-btn {
-      position: static;
-      margin-top: 12px;
-      display: block;
-      text-align: center;
-    }
-  }
-</style>
 
 <div class="container">
 
@@ -76,17 +132,33 @@
   <div class="card">
     <h2>📤 Share Files</h2>
 
-    <!-- Drop zone — clicking this opens file picker -->
-    <div class="drop-zone" id="dropZone">
-      <div class="drop-icon">📁</div>
-      <p class="drop-text">Drag &amp; drop files here</p>
-      <p class="drop-sub">or click anywhere to browse</p>
-      <!-- Hidden real input -->
-      <input type="file" id="fileInput" multiple style="display:none">
+    <!-- ✅ Upload area wraps BOTH drop zone and browse button -->
+    <div class="upload-area" id="uploadArea">
+
+      <!-- Visual drop zone (click handled separately) -->
+      <div class="drop-zone" id="dropZoneVisual">
+        <div class="drop-icon">📁</div>
+        <p class="drop-text">Drag &amp; drop files here</p>
+        <p class="drop-sub">or use the button below</p>
+      </div>
+
+      <!-- ✅ Visible button that directly triggers file input — 100% reliable -->
+      <label class="browse-btn" for="fileInput">📂 Browse &amp; Add Files</label>
+
+      <!-- Hidden file input triggered by label -->
+      <input type="file" id="fileInput" multiple style="display:none; position:absolute; left:-9999px;">
     </div>
 
     <!-- Selected files list -->
     <ul id="selectedFiles"></ul>
+
+    <!-- Upload progress bar -->
+    <div class="upload-progress" id="uploadProgress">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label" id="progressLabel">Uploading…</div>
+    </div>
 
     <label class="field-label" for="duration">Access Duration</label>
     <select id="duration">
@@ -95,15 +167,13 @@
       <option value="7d">7 Days</option>
     </select>
 
-    <!-- ✅ id="generateBtn" — NO onclick here, handled in script.js -->
     <button id="generateBtn">⚡ Generate Link</button>
 
-    <!-- Result box (hidden until link generated) -->
+    <!-- Result box -->
     <div id="resultBox" class="result-box" style="display:none;">
       <p class="result-label">✅ Share this link:</p>
       <div class="url-row">
         <span id="generatedUrl"></span>
-        <!-- ✅ id="copyBtn" — NO onclick here -->
         <button id="copyBtn">Copy</button>
       </div>
       <p class="code-hint">Code: <strong id="generatedCode"></strong></p>
@@ -114,12 +184,8 @@
   <div class="card">
     <h2>📥 Access Files</h2>
     <p class="card-sub">Paste the share link or enter the 6-digit code</p>
-
     <input type="text" id="accessInput" placeholder="Paste link or enter code…" autocomplete="off">
-
-    <!-- ✅ onclick here is fine since accessFiles is a global function -->
     <button onclick="accessFiles()">🔍 Access Files</button>
-
     <div id="fileList"></div>
   </div>
 
@@ -172,4 +238,10 @@
   </div>
   <div class="footer-bottom">
     © 2026 Localshare · Temporary File Sharing Without Login ·
-    <a href="/cdn-cgi/l/email-protection#b8dad1cccbcaddcbd7cdcadbddcbca8a8af8dfd5d9d1d496dbd7d5"><span class="__cf_email__" data-cfemail="20424954535
+    <a href="mailto:bitsresourcesr22@gmail.com">bitsresourcesr22@gmail.com</a>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -4,51 +4,55 @@ let selectedFiles = [];
 document.addEventListener("DOMContentLoaded", () => {
 
   const fileInput   = document.getElementById("fileInput");
-  const dropZone    = document.getElementById("dropZone");
+  const uploadArea  = document.getElementById("uploadArea");
   const generateBtn = document.getElementById("generateBtn");
   const copyBtn     = document.getElementById("copyBtn");
   const accessInput = document.getElementById("accessInput");
 
-  /* ── FILE INPUT CHANGE ────────────────────────────────── */
+  /* ── FILE INPUT CHANGE ─────────────────────────────────── */
+  // ✅ This is triggered by the <label for="fileInput"> browse button
+  // Label→input binding is the most reliable cross-browser method
   fileInput.addEventListener("change", (e) => {
     addFiles([...e.target.files]);
     e.target.value = ""; // allow re-selecting same file
   });
 
-  /* ── CLICK ON DROP ZONE → open file picker ─────────────── */
-  dropZone.addEventListener("click", (e) => {
-    if (e.target.tagName !== "LABEL" && e.target.tagName !== "INPUT") {
-      fileInput.click();
+  /* ── DRAG EVENTS on the whole upload area ─────────────── */
+  uploadArea.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    uploadArea.classList.add("drag-over");
+  });
+
+  uploadArea.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadArea.classList.add("drag-over");
+  });
+
+  uploadArea.addEventListener("dragleave", (e) => {
+    // Only remove if leaving the entire upload area (not a child)
+    if (!uploadArea.contains(e.relatedTarget)) {
+      uploadArea.classList.remove("drag-over");
     }
   });
 
-  /* ── DRAG OVER ──────────────────────────────────────────── */
-  dropZone.addEventListener("dragover", (e) => {
+  uploadArea.addEventListener("drop", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    dropZone.classList.add("drag-over");
-  });
-
-  dropZone.addEventListener("dragleave", (e) => {
-    e.stopPropagation();
-    dropZone.classList.remove("drag-over");
-  });
-
-  /* ── DROP ───────────────────────────────────────────────── */
-  dropZone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("drag-over");
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      addFiles([...e.dataTransfer.files]);
+    uploadArea.classList.remove("drag-over");
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      addFiles([...files]);
     }
   });
 
-  /* ── BUTTONS ────────────────────────────────────────────── */
+  /* ── GENERATE BUTTON ───────────────────────────────────── */
   generateBtn.addEventListener("click", uploadFiles);
+
+  /* ── COPY BUTTON ───────────────────────────────────────── */
   copyBtn.addEventListener("click", copyUrl);
 
-  /* ── ENTER KEY ON ACCESS INPUT ──────────────────────────── */
+  /* ── ENTER KEY ON ACCESS INPUT ─────────────────────────── */
   if (accessInput) {
     accessInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") accessFiles();
@@ -59,13 +63,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
 /* ─── ADD FILES (no duplicates) ──────────────────────────── */
 function addFiles(newFiles) {
+  let added = 0;
   newFiles.forEach(file => {
     const isDup = selectedFiles.some(
       f => f.name === file.name && f.size === file.size
     );
-    if (!isDup) selectedFiles.push(file);
+    if (!isDup) { selectedFiles.push(file); added++; }
   });
-  renderFileList();
+
+  if (added > 0) {
+    renderFileList();
+    showToast(`✅ ${added} file${added > 1 ? "s" : ""} added`, "success");
+  }
 }
 
 /* ─── RENDER FILE LIST ───────────────────────────────────── */
@@ -82,7 +91,6 @@ function renderFileList() {
       </span>
       <span class="remove" title="Remove">✕</span>
     `;
-    // Use addEventListener instead of onclick to avoid index issues
     li.querySelector(".remove").addEventListener("click", () => removeFile(index));
     list.appendChild(li);
   });
@@ -97,55 +105,88 @@ function removeFile(index) {
 /* ─── UPLOAD ─────────────────────────────────────────────── */
 async function uploadFiles() {
   if (selectedFiles.length === 0) {
-    const dz = document.getElementById("dropZone");
-    dz.classList.add("shake");
-    setTimeout(() => dz.classList.remove("shake"), 600);
+    const area = document.getElementById("uploadArea");
+    area.classList.add("shake");
+    setTimeout(() => area.classList.remove("shake"), 600);
     showToast("Please add at least one file!", "error");
     return;
   }
 
-  const btn       = document.getElementById("generateBtn");
-  const resultBox = document.getElementById("resultBox");
+  const btn         = document.getElementById("generateBtn");
+  const resultBox   = document.getElementById("resultBox");
+  const progressWrap = document.getElementById("uploadProgress");
+  const progressFill = document.getElementById("progressFill");
+  const progressLabel = document.getElementById("progressLabel");
 
   btn.disabled    = true;
   btn.textContent = "Uploading…";
   if (resultBox) resultBox.style.display = "none";
 
-  const formData = new FormData();
+  // Show progress bar
+  progressWrap.classList.add("visible");
+  progressFill.style.width = "0%";
+  progressLabel.textContent = "Preparing upload…";
 
-  // ✅ Correct way — loop and append each file
+  // Animate progress (fake progress while waiting for server)
+  let fakeProgress = 0;
+  const progressInterval = setInterval(() => {
+    fakeProgress = Math.min(fakeProgress + Math.random() * 6, 88);
+    progressFill.style.width = fakeProgress + "%";
+    progressLabel.textContent = `Uploading… ${Math.round(fakeProgress)}%`;
+  }, 300);
+
+  const formData = new FormData();
   for (let i = 0; i < selectedFiles.length; i++) {
     formData.append("files", selectedFiles[i]);
   }
   formData.append("duration", document.getElementById("duration").value);
 
-  // ✅ NEVER manually set Content-Type for FormData — browser adds boundary
   try {
     const res = await fetch("/upload", {
       method: "POST",
       body: formData
+      // ✅ Never set Content-Type manually for FormData
     });
 
-    if (!res.ok) throw new Error("Server responded with " + res.status);
+    clearInterval(progressInterval);
+
+    if (!res.ok) {
+      // Try to get error message from server
+      let errMsg = `Server error (${res.status})`;
+      try {
+        const errData = await res.json();
+        errMsg = errData.error || errMsg;
+      } catch {}
+      throw new Error(errMsg);
+    }
 
     const data = await res.json();
 
     if (data.error) {
-      showToast("❌ " + data.error, "error");
-      return;
+      throw new Error(data.error);
     }
 
-    // Populate result
+    // Complete progress bar
+    progressFill.style.width = "100%";
+    progressLabel.textContent = "✅ Upload complete!";
+
+    // Show result
     document.getElementById("generatedUrl").textContent = data.url;
     const codeEl = document.getElementById("generatedCode");
     if (codeEl) codeEl.textContent = data.code;
-    if (resultBox) resultBox.style.display = "flex";
+
+    setTimeout(() => {
+      progressWrap.classList.remove("visible");
+      if (resultBox) resultBox.style.display = "flex";
+    }, 600);
 
     showToast("✅ Link generated successfully!", "success");
 
   } catch (err) {
+    clearInterval(progressInterval);
+    progressWrap.classList.remove("visible");
     console.error("Upload error:", err);
-    showToast("❌ Upload failed. Check your connection.", "error");
+    showToast("❌ " + (err.message || "Upload failed. Please try again."), "error");
   } finally {
     btn.disabled    = false;
     btn.textContent = "⚡ Generate Link";
@@ -166,13 +207,11 @@ function copyUrl() {
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(text).then(() => flashCopied(btn));
   } else {
-    // Fallback for HTTP
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.style.cssText = "position:fixed;opacity:0;top:0;left:0";
     document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
+    ta.focus(); ta.select();
     try   { document.execCommand("copy"); flashCopied(btn); }
     catch { showToast("Copy failed — please copy manually", "error"); }
     document.body.removeChild(ta);
@@ -182,12 +221,9 @@ function copyUrl() {
 function flashCopied(btn) {
   if (!btn) return;
   const orig = btn.textContent;
-  btn.textContent    = "Copied ✓";
+  btn.textContent = "Copied ✓";
   btn.style.background = "#16a34a";
-  setTimeout(() => {
-    btn.textContent    = orig;
-    btn.style.background = "";
-  }, 2000);
+  setTimeout(() => { btn.textContent = orig; btn.style.background = ""; }, 2000);
 }
 
 /* ─── ACCESS FILES ───────────────────────────────────────── */
@@ -201,10 +237,9 @@ async function accessFiles() {
     return;
   }
 
-  // Accept full URL OR bare 6-digit code
   let code;
   const urlMatch = raw.match(/\/access\/(\d{6})/);
-  if (urlMatch)        code = urlMatch[1];
+  if (urlMatch)                  code = urlMatch[1];
   else if (/^\d{6}$/.test(raw)) code = raw;
   else {
     list.innerHTML = '<div class="error-msg">Enter the full share link or a 6-digit code.</div>';
@@ -231,7 +266,7 @@ async function accessFiles() {
           ${getIcon(file.name)} ${escHtml(file.name)}
           ${file.size ? `<small style="color:#999"> (${formatBytes(file.size)})</small>` : ""}
         </span>
-        <a href="${file.url}" download="${escHtml(file.name)}">⬇ Download</a>
+        <a href="${escHtml(file.url)}" download="${escHtml(file.name)}">⬇ Download</a>
       `;
       list.appendChild(item);
     });
