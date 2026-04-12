@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Location Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --bg: #06090f;
+    --surface: #0c1420;
+    --border: #182335;
+    --green: #00ff88;
+    --cyan: #00e5ff;
+    --orange: #ff6b35;
+    --text: #c8d8e8;
+    --muted: #3d5570;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 3rem;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .container { width: 100%; max-width: 780px; position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header { text-align: center; margin-bottom: 2rem; }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.67rem; color: var(--cyan);
+    letter-spacing: 0.35em; text-transform: uppercase;
+    border: 1px solid var(--cyan);
+    display: inline-block; padding: 4px 14px; margin-bottom: 1rem;
+    animation: glow-cyan 2s infinite;
+  }
+
+  @keyframes glow-cyan {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,0.4); }
+    50%      { box-shadow: 0 0 0 8px rgba(0,229,255,0); }
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3.6rem);
+    font-weight: 800; letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 20%, var(--cyan) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle { font-family: 'Space Mono', monospace; color: var(--muted); font-size: 0.7rem; margin-top: 0.4rem; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    border: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+
+  .tab {
+    flex: 1; padding: 0.85rem 0.5rem;
+    background: var(--surface);
+    border: none; border-right: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.25s;
+    color: var(--muted);
+  }
+
+  .tab:last-child { border-right: none; }
+
+  .tab.active-gps  { background: var(--green);  color: #000; font-weight: 700; }
+  .tab.active-ip   { background: var(--cyan);   color: #000; font-weight: 700; }
+  .tab:not([class*="active"]):hover { color: var(--cyan); }
+
+  /* ── PANELS ── */
+  .panel { display: none; }
+  .panel.visible { display: block; animation: fadeUp 0.35s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:translateY(0);} }
+
+  /* ════════════════════════════
+     GPS PANEL
+  ════════════════════════════ */
+  .gps-idle {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 2.5rem 2rem; text-align: center;
+  }
+
+  .pin-anim { font-size: 3.5rem; display: block; margin-bottom: 1.2rem; animation: bounce 2s ease-in-out infinite; }
+  @keyframes bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+
+  .gps-title { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+  .gps-desc  { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--muted); line-height: 1.9; margin-bottom: 1.8rem; }
+
+  .locate-btn {
+    display: inline-block; background: var(--green); border: none; color: #000;
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: 0.95rem; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 1rem 2.8rem; cursor: pointer; transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+
+  .locate-btn::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%);
+    transform: translateX(-100%); transition: 0.5s;
+  }
+  .locate-btn:hover::before { transform: translateX(100%); }
+  .locate-btn:hover { background: #22ffaa; }
+  .locate-btn:active { transform: scale(0.97); }
+
+  .gps-note { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--muted); margin-top: 1rem; line-height: 1.7; }
+
+  /* ════════════════════════════
+     IP PANEL
+  ════════════════════════════ */
+  .ip-search-box {
+    display: flex;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: border-color 0.3s;
+    margin-bottom: 0.8rem;
+  }
+
+  .ip-search-box:focus-within { border-color: var(--cyan); box-shadow: 0 0 18px rgba(0,229,255,0.1); }
+
+  .ip-search-box input {
+    flex: 1; min-width: 0;
+    background: transparent; border: none; outline: none;
+    padding: 0.9rem 1.2rem;
+    font-family: 'Space Mono', monospace; font-size: 0.95rem;
+    color: #fff; letter-spacing: 0.05em;
+  }
+
+  .ip-search-box input::placeholder { color: var(--muted); }
+
+  .ip-search-box button {
+    background: var(--cyan); border: none; color: #000;
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 0.82rem; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.9rem 1.5rem; cursor: pointer; flex-shrink: 0; transition: 0.2s;
+  }
+
+  .ip-search-box button:hover { background: #33eeff; }
+  .ip-search-box button:active { transform: scale(0.97); }
+
+  .my-ip-btn {
+    width: 100%; display: block; text-align: center;
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'Space Mono', monospace; font-size: 0.68rem;
+    padding: 0.5rem; cursor: pointer; transition: all 0.2s;
+    margin-bottom: 1.5rem; letter-spacing: 0.05em;
+  }
+  .my-ip-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  .ip-warning {
+    border: 1px solid rgba(255,107,53,0.35);
+    background: rgba(255,107,53,0.05);
+    padding: 0.8rem 1.1rem; margin-bottom: 1.5rem;
+    font-family: 'Space Mono', monospace; font-size: 0.63rem;
+    color: var(--orange); line-height: 1.8;
+  }
+
+  /* ════════════════════════════
+     SHARED: Loading / Error / Result
+  ════════════════════════════ */
+  .loading { display: none; text-align: center; padding: 2.5rem; font-family: 'Space Mono', monospace; font-size: 0.78rem; color: var(--muted); letter-spacing: 0.15em; }
+  .loading.visible { display: block; }
+
+  .radar-wrap { position: relative; width: 80px; height: 80px; margin: 0 auto 1.5rem; }
+  .r-ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--green); opacity: 0.3; }
+  .r-ring:nth-child(2) { inset: 14px; }
+  .r-ring:nth-child(3) { inset: 28px; }
+  .r-sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(0,255,136,0.6), transparent 70%); animation: sweep 1.4s linear infinite; }
+  @keyframes sweep { to{transform:rotate(360deg);} }
+  .r-dot { position: absolute; top:50%; left:50%; width:8px; height:8px; border-radius:50%; background:var(--green); transform:translate(-50%,-50%); box-shadow:0 0 8px var(--green); }
+
+  .spin-wrap { display: inline-block; margin: 0 auto 1rem; }
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+
+  .load-lbl { animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  .err-box { display: none; padding: 1rem 1.3rem; border: 1px solid var(--orange); background: rgba(255,107,53,0.05); font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--orange); line-height: 1.7; margin-bottom: 1rem; }
+  .err-box.visible { display: block; }
+
+  .retry-btn { background: none; border: 1px solid var(--orange); color: var(--orange); font-family: 'Space Mono', monospace; font-size: 0.68rem; padding: 0.4rem 1rem; cursor: pointer; margin-top: 0.7rem; transition: 0.2s; }
+  .retry-btn:hover { background: rgba(255,107,53,0.1); }
+
+  /* ── Result card ── */
+  .result { display: none; animation: fadeUp 0.45s cubic-bezier(0.16,1,0.3,1); }
+  .result.visible { display: block; }
+
+  .res-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.9rem 1.2rem;
+    background: var(--surface); border: 1px solid var(--border); border-bottom: none;
+  }
+
+  .res-ip { font-family: 'Space Mono', monospace; font-size: 1rem; }
+  .res-ip.green { color: var(--green); }
+  .res-ip.cyan  { color: var(--cyan); }
+
+  .badge {
+    font-family: 'Space Mono', monospace; font-size: 0.58rem;
+    padding: 4px 10px; letter-spacing: 0.1em; flex-shrink: 0;
+  }
+  .badge.gps { background: rgba(0,255,136,0.12); color: var(--green); border: 1px solid var(--green); }
+  .badge.ip  { background: rgba(0,229,255,0.1);  color: var(--cyan);  border: 1px solid var(--cyan);  }
+
+  .info-grid {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    border: 1px solid var(--border); border-bottom: none;
+  }
+
+  @media(max-width:500px) {
+    .info-grid { grid-template-columns: repeat(2,1fr); }
+    .cell:nth-child(3n)   { border-right: 1px solid var(--border) !important; }
+    .cell:nth-child(2n)   { border-right: none !important; }
+  }
+
+  .cell { padding: 1rem 1.1rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .cell:nth-child(3n) { border-right: none; }
+  .cell-label { font-family: 'Space Mono', monospace; font-size: 0.55rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.3rem; }
+  .cell-val { font-size: 0.88rem; font-weight: 700; color: #fff; word-break: break-word; }
+  .cell-val.green { color: var(--green); }
+  .cell-val.cyan  { color: var(--cyan); font-size: 0.78rem; }
+
+  .acc-strip {
+    padding: 0.52rem 1.2rem;
+    font-family: 'Space Mono', monospace; font-size: 0.62rem; letter-spacing: 0.05em;
+    border: 1px solid; border-top: none; border-bottom: none;
+  }
+  .acc-strip.gps-strip { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.05); color: var(--green); }
+  .acc-strip.ip-strip  { border-color: rgba(255,107,53,0.3); background: rgba(255,107,53,0.05); color: var(--orange); }
+
+  #gpsMap, #ipMap {
+    width: 100%; height: 340px;
+    border: 1px solid var(--border); background: #0a1020;
+  }
+
+  .leaflet-tile { filter: brightness(0.75) saturate(0.5) hue-rotate(180deg) invert(1) contrast(0.85); }
+  .leaflet-container { background: #0d1b2a; }
+
+  .gps-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--green); border: 2.5px solid #fff;
+    animation: gps-pulse 2s infinite;
+  }
+  @keyframes gps-pulse { 0%{box-shadow:0 0 0 0 rgba(0,255,136,0.8);} 70%{box-shadow:0 0 0 18px rgba(0,255,136,0);} 100%{box-shadow:0 0 0 0 rgba(0,255,136,0);} }
+
+  .ip-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--cyan); border: 2.5px solid #fff;
+    animation: ip-pulse 2s infinite;
+  }
+  @keyframes ip-pulse { 0%{box-shadow:0 0 0 0 rgba(0,229,255,0.8);} 70%{box-shadow:0 0 0 18px rgba(0,229,255,0);} 100%{box-shadow:0 0 0 0 rgba(0,229,255,0);} }
+
+  .coords-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.7rem 1.2rem;
+    background: var(--surface); border: 1px solid var(--border); border-top: none;
+    flex-wrap: wrap; gap: 0.5rem;
+  }
+
+  .coords-text { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--orange); }
+
+  .bar-btns { display: flex; gap: 0.6rem; }
+  .bar-btn {
+    font-family: 'Space Mono', monospace; font-size: 0.62rem;
+    padding: 4px 12px; cursor: pointer; transition: all 0.2s;
+    text-decoration: none; background: none;
+  }
+  .bar-btn.green { border: 1px solid var(--green); color: var(--green); }
+  .bar-btn.green:hover { background: rgba(0,255,136,0.1); }
+  .bar-btn.cyan  { border: 1px solid var(--cyan);  color: var(--cyan); }
+  .bar-btn.cyan:hover  { background: rgba(0,229,255,0.1); }
+
+  /* ── Network Block ── */
+  .net-block {
+    display: none; border: 1px solid rgba(255,107,53,0.35);
+    border-top: none; background: rgba(255,107,53,0.04);
+    animation: fadeUp 0.4s ease;
+  }
+  .net-block.visible { display: block; }
+  .net-block-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0.6rem 1.2rem;
+    border-bottom: 1px solid rgba(255,107,53,0.2);
+    background: rgba(255,107,53,0.06);
+  }
+  .net-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 8px var(--orange); flex-shrink: 0; animation: glow-orange 2s infinite; }
+  @keyframes glow-orange { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  .net-block-title { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--orange); }
+  .net-grid {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    border-bottom: 1px solid rgba(255,107,53,0.2);
+  }
+  @media(max-width:500px) { .net-grid { grid-template-columns: repeat(2,1fr); } }
+  .net-cell { padding: 0.85rem 1.1rem; border-right: 1px solid rgba(255,107,53,0.15); border-bottom: 1px solid rgba(255,107,53,0.15); }
+  .net-cell:nth-child(3n) { border-right: none; }
+  .net-cell .cell-label { color: rgba(255,107,53,0.55); }
+  .net-cell .cell-val { color: var(--orange); }
+  .net-cell .cell-val.white { color: #fff; }
+  .net-cell .cell-val.green { color: var(--green); }
+  .net-cell-full { grid-column: 1 / -1; padding: 0.85rem 1.1rem; border-bottom: 1px solid rgba(255,107,53,0.15); }
+  .net-cell-full .cell-label { color: rgba(255,107,53,0.55); margin-bottom: 0.3rem; font-family: 'Space Mono', monospace; font-size: 0.55rem; letter-spacing: 0.2em; text-transform: uppercase; }
+  .net-cell-full .cell-val { font-size: 0.95rem; font-weight: 700; color: var(--orange); }
+
+  .relocate-row { margin-top: 1rem; text-align: center; }
+  .small-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'Space Mono', monospace; font-size: 0.65rem;
+    padding: 0.5rem 1.5rem; cursor: pointer; letter-spacing: 0.08em; transition: all 0.2s;
+  }
+  .small-btn:hover { border-color: var(--green); color: var(--green); }
+
+  footer { margin-top: 2.5rem; text-align: center; font-family: 'Space Mono', monospace; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.08em; line-height: 2; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="tag">Network Intelligence</div>
+    <h1>LOCATION TRACKER</h1>
+    <p class="subtitle">// exact gps · ip address lookup</p>
+  </header>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active-gps" id="tabGps" onclick="switchTab('gps')">📍 Exact GPS Location</button>
+    <button class="tab" id="tabIp"  onclick="switchTab('ip')">🌐 IP Address Lookup</button>
+  </div>
+
+  <!-- ══════════════════════════════
+       GPS PANEL
+  ══════════════════════════════ -->
+  <div class="panel visible" id="panelGps">
+
+    <!-- Idle -->
+    <div id="gpsIdle">
+      <div class="gps-idle">
+        <span class="pin-anim">📍</span>
+        <div class="gps-title">Find Your Exact Location</div>
+        <div class="gps-desc">
+          Uses your device GPS or Wi-Fi signal to pinpoint<br>
+          your exact position accurate to within meters.
+        </div>
+        <button class="locate-btn" onclick="startGPS()">📡 LOCATE ME NOW</button>
+        <div class="gps-note">🔒 Browser will ask for permission. Location is never stored.</div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="gpsLoad">
+      <div class="radar-wrap">
+        <div class="r-ring"></div><div class="r-ring"></div><div class="r-ring"></div>
+        <div class="r-sweep"></div><div class="r-dot"></div>
+      </div>
+      <div class="load-lbl">ACQUIRING GPS SIGNAL...</div>
+    </div>
+
+    <!-- Error -->
+    <div class="err-box" id="gpsErr">
+      <span id="gpsErrMsg"></span><br>
+      <button class="retry-btn" onclick="gpsRetry()">↺ Try Again</button>
+    </div>
+
+    <!-- Result -->
+    <div class="result" id="gpsResult">
+      <div class="res-header">
+        <span class="res-ip green" id="gpsAddrShort">—</span>
+        <span class="badge gps">✓ GPS EXACT</span>
+      </div>
+      <div class="info-grid">
+        <div class="cell"><div class="cell-label">Street</div><div class="cell-val" id="gStreet">—</div></div>
+        <div class="cell"><div class="cell-label">City</div><div class="cell-val" id="gCity">—</div></div>
+        <div class="cell"><div class="cell-label">Country</div><div class="cell-val" id="gCountry">—</div></div>
+        <div class="cell"><div class="cell-label">Latitude</div><div class="cell-val green" id="gLat">—</div></div>
+        <div class="cell"><div class="cell-label">Longitude</div><div class="cell-val green" id="gLon">—</div></div>
+        <div class="cell"><div class="cell-label">Accuracy</div><div class="cell-val cyan" id="gAcc">—</div></div>
+      </div>
+      <div class="acc-strip gps-strip" id="gStrip">✓ GPS exact — real device position</div>
+      <div id="gpsMap"></div>
+      <div class="coords-bar">
+        <span class="coords-text" id="gCoords">—</span>
+        <div class="bar-btns">
+          <a class="bar-btn green" id="gMapsLink" href="#" target="_blank">→ Google Maps</a>
+          <button class="bar-btn green" onclick="gpsShare()">⬆ Share</button>
+        </div>
+      </div>
+      <!-- Network / ISP block -->
+      <div class="net-block" id="netBlock">
+        <div class="net-block-header">
+          <div class="net-dot"></div>
+          <span class="net-block-title">📶 Network Used at This Location</span>
+        </div>
+        <div class="net-grid">
+          <div class="net-cell net-cell-full">
+            <div class="cell-label">ISP / Organization</div>
+            <div class="cell-val" id="nIsp">—</div>
+          </div>
+          <div class="net-cell">
+            <div class="cell-label">Public IP</div>
+            <div class="cell-val white" id="nIp">—</div>
+          </div>
+          <div class="net-cell">
+            <div class="cell-label">AS Number</div>
+            <div class="cell-val green" id="nAsn">—</div>
+          </div>
+          <div class="net-cell">
+            <div class="cell-label">IP Version</div>
+            <div class="cell-val white" id="nVersion">—</div>
+          </div>
+          <div class="net-cell">
+            <div class="cell-label">Connection</div>
+            <div class="cell-val white" id="nConn">—</div>
+          </div>
+          <div class="net-cell">
+            <div class="cell-label">Downlink Speed</div>
+            <div class="cell-val green" id="nSpeed">—</div>
+          </div>
+          <div class="net-cell">
+            <div class="cell-label">Network Type</div>
+            <div class="cell-val white" id="nType">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="relocate-row">
+        <button class="small-btn" onclick="gpsRetry()">↺ Re-detect my location</button>
+      </div>
+    </div>
+
+  </div><!-- /GPS panel -->
+
+  <!-- ══════════════════════════════
+       IP PANEL
+  ══════════════════════════════ -->
+  <div class="panel" id="panelIp">
+
+    <div class="ip-search-box">
+      <input type="text" id="ipInput" placeholder="Enter any IP address (e.g. 8.8.8.8)" spellcheck="false"/>
+      <button onclick="lookupIP()">TRACE</button>
+    </div>
+    <button class="my-ip-btn" onclick="myIP()">⬡ Look up my own IP address</button>
+
+    <div class="ip-warning">
+      ⚠ IP geolocation shows the <strong>ISP's approximate area</strong>, not the exact device location.<br>
+      Accuracy is typically city-level (±5–50 km). Exact location from IP is <strong>technically impossible</strong>.
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="ipLoad">
+      <div class="spin-wrap"><div class="spinner"></div></div>
+      <div class="load-lbl">LOCATING IP...</div>
+    </div>
+
+    <!-- Error -->
+    <div class="err-box" id="ipErr">
+      <span id="ipErrMsg"></span>
+    </div>
+
+    <!-- Result -->
+    <div class="result" id="ipResult">
+      <div class="res-header">
+        <span class="res-ip cyan" id="ipDisplay">—</span>
+        <span class="badge ip">IP APPROX</span>
+      </div>
+      <div class="info-grid">
+        <div class="cell"><div class="cell-label">Country</div><div class="cell-val" id="iCountry">—</div></div>
+        <div class="cell"><div class="cell-label">Region</div><div class="cell-val" id="iRegion">—</div></div>
+        <div class="cell"><div class="cell-label">City</div><div class="cell-val" id="iCity">—</div></div>
+        <div class="cell"><div class="cell-label">Timezone</div><div class="cell-val" id="iTimezone">—</div></div>
+        <div class="cell"><div class="cell-label">ISP / Org</div><div class="cell-val cyan" id="iOrg">—</div></div>
+        <div class="cell"><div class="cell-label">Postal</div><div class="cell-val" id="iPostal">—</div></div>
+      </div>
+      <div class="acc-strip ip-strip">⚠ IP APPROX — shows ISP area only, not exact device address</div>
+      <div id="ipMap"></div>
+      <div class="coords-bar">
+        <span class="coords-text" id="iCoords">—</span>
+        <div class="bar-btns">
+          <a class="bar-btn cyan" id="iMapsLink" href="#" target="_blank">→ Google Maps</a>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /IP panel -->
+
+  <footer>
+    GPS: BROWSER LOCATION API · IP: IPAPI.CO<br>
+    MAP: OPENSTREETMAP · HTTPS SECURE · FOR EDUCATIONAL USE ONLY
+  </footer>
+</div>
+
+<script>
+  // ── Maps ──────────────────────────────────────────
+  let gpsMap = null, gpsMarker = null, gpsCircle = null;
+  let ipMap  = null, ipMarker  = null, ipCircle  = null;
+  let curLat = null, curLon = null;
+
+  // ── Tabs ──────────────────────────────────────────
+  function switchTab(t) {
+    document.getElementById('tabGps').className  = 'tab' + (t==='gps' ? ' active-gps' : '');
+    document.getElementById('tabIp').className   = 'tab' + (t==='ip'  ? ' active-ip'  : '');
+    document.getElementById('panelGps').classList.toggle('visible', t==='gps');
+    document.getElementById('panelIp').classList.toggle('visible',  t==='ip');
+    // Invalidate map sizes after tab switch
+    setTimeout(() => {
+      if (t==='gps' && gpsMap) gpsMap.invalidateSize();
+      if (t==='ip'  && ipMap)  ipMap.invalidateSize();
+    }, 100);
+  }
+
+  // ════════════════════════════
+  // GPS
+  // ════════════════════════════
+  function startGPS() {
+    if (!navigator.geolocation) { showGpsErr('Your browser does not support GPS. Use Chrome or Firefox.'); return; }
+    document.getElementById('gpsIdle').style.display = 'none';
+    hide('gpsErr'); hide('gpsResult');
+    show('gpsLoad');
+    navigator.geolocation.getCurrentPosition(gpsSuccess, gpsError, {
+      enableHighAccuracy: true, timeout: 20000, maximumAge: 0
+    });
+  }
+
+  async function gpsSuccess(pos) {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const acc = pos.coords.accuracy;
+    curLat = lat; curLon = lon;
+
+    let street='—', city='—', country='—', addrShort='Your Location';
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`);
+      const d = await r.json();
+      const a = d.address || {};
+      street  = (a.road || a.pedestrian || '—') + (a.house_number ? ' '+a.house_number : '');
+      city    = a.city || a.town || a.village || a.suburb || '—';
+      country = a.country || '—';
+      addrShort = [a.road, city].filter(Boolean).join(', ') || 'Your Location';
+    } catch(e) {}
+
+    hide('gpsLoad');
+    document.getElementById('gpsAddrShort').textContent = addrShort;
+    document.getElementById('gStreet').textContent  = street;
+    document.getElementById('gCity').textContent    = city;
+    document.getElementById('gCountry').textContent = country;
+    document.getElementById('gLat').textContent     = lat.toFixed(6)+'°';
+    document.getElementById('gLon').textContent     = lon.toFixed(6)+'°';
+    const accTxt = acc<10?`±${Math.round(acc)}m — Excellent`:acc<50?`±${Math.round(acc)}m — Very Good`:acc<200?`±${Math.round(acc)}m — Good`:`±${Math.round(acc)}m — Approx`;
+    document.getElementById('gAcc').textContent     = accTxt;
+    document.getElementById('gStrip').textContent   = `✓ GPS lock · Accuracy: ${accTxt}`;
+    document.getElementById('gCoords').textContent  = `${lat.toFixed(6)}°, ${lon.toFixed(6)}°`;
+    document.getElementById('gMapsLink').href       = `https://www.google.com/maps?q=${lat},${lon}`;
+    show('gpsResult');
+    fetchNetworkAtLocation();
+
+    setTimeout(() => {
+      const zoom = acc<20?18:acc<100?17:acc<500?15:13;
+      if (!gpsMap) {
+        gpsMap = L.map('gpsMap', { zoomControl:true, scrollWheelZoom:true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(gpsMap);
+      }
+      gpsMap.setView([lat,lon], zoom);
+      if (gpsMarker) gpsMap.removeLayer(gpsMarker);
+      if (gpsCircle) gpsMap.removeLayer(gpsCircle);
+
+      gpsMarker = L.marker([lat,lon], { icon: L.divIcon({ className:'', html:'<div class="gps-dot"></div>', iconSize:[18,18], iconAnchor:[9,9] }) }).addTo(gpsMap);
+      gpsMarker.bindPopup(`<b>📍 You are here</b><br>${addrShort}<br><small>Accuracy: ±${Math.round(acc)}m</small>`).openPopup();
+      gpsCircle = L.circle([lat,lon], { radius:acc, color:'#00ff88', fillColor:'#00ff88', fillOpacity:0.12, weight:2 }).addTo(gpsMap);
+      gpsMap.invalidateSize();
+    }, 200);
+  }
+
+  function gpsError(err) {
+    const msgs = { 1:'Permission denied. Click the 🔒 lock icon in your address bar → set Location to Allow → refresh.', 2:'GPS signal unavailable. Go near a window or outdoors and try again.', 3:'Request timed out. Please try again.' };
+    showGpsErr(msgs[err.code] || 'Could not get location.');
+  }
+
+  function showGpsErr(msg) {
+    hide('gpsLoad'); hide('gpsResult');
+    document.getElementById('gpsErrMsg').textContent = '⚠ ' + msg;
+    show('gpsErr');
+  }
+
+  async function fetchNetworkAtLocation() {
+    try {
+      const r = await fetch('https://ipapi.co/json/', { headers:{ 'Accept':'application/json' } });
+      const d = await r.json();
+      if (d.error) throw new Error();
+      document.getElementById('nIsp').textContent     = d.org || d.isp || '—';
+      document.getElementById('nIp').textContent      = d.ip  || '—';
+      document.getElementById('nAsn').textContent     = d.asn || '—';
+      document.getElementById('nVersion').textContent = d.version || '—';
+    } catch(e) {
+      document.getElementById('nIsp').textContent = 'Could not fetch (try again)';
+    }
+    // Browser connection API
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+      document.getElementById('nConn').textContent  = conn.effectiveType || '—';
+      document.getElementById('nSpeed').textContent = conn.downlink ? conn.downlink + ' Mbps' : '—';
+      document.getElementById('nType').textContent  = conn.type || conn.effectiveType || '—';
+    } else {
+      document.getElementById('nConn').textContent  = 'API unsupported';
+      document.getElementById('nSpeed').textContent = '—';
+      document.getElementById('nType').textContent  = '—';
+    }
+    document.getElementById('netBlock').classList.add('visible');
+  }
+
+  function gpsRetry() {
+    hide('gpsErr'); hide('gpsResult');
+    document.getElementById('netBlock').classList.remove('visible');
+    document.getElementById('gpsIdle').style.display = 'block';
+  }
+
+  async function gpsShare() {
+    if (!curLat||!curLon) return;
+    const url = `https://www.google.com/maps?q=${curLat},${curLon}`;
+    if (navigator.share) { try { await navigator.share({ title:'My Location', url }); return; } catch(e){} }
+    try { await navigator.clipboard.writeText(url); alert('📋 Location link copied!'); } catch(e) { prompt('Copy:', url); }
+  }
+
+  // ════════════════════════════
+  // IP LOOKUP
+  // ════════════════════════════
+  document.getElementById('ipInput').addEventListener('keydown', e => { if(e.key==='Enter') lookupIP(); });
+
+  async function fetchIP(ip) {
+    try {
+      const url = ip ? `https://ipapi.co/${ip}/json/` : `https://ipapi.co/json/`;
+      const r = await fetch(url, { headers:{ 'Accept':'application/json' } });
+      const d = await r.json();
+      if (d.error) throw new Error(d.reason);
+      return { ip:d.ip, country:d.country_name, region:d.region, city:d.city, timezone:d.timezone, org:d.org, postal:d.postal||'—', lat:d.latitude, lon:d.longitude };
+    } catch(e) {}
+    try {
+      const url = ip ? `https://freeipapi.com/api/json/${ip}` : `https://freeipapi.com/api/json`;
+      const r = await fetch(url);
+      const d = await r.json();
+      if (!d.ipAddress) throw new Error();
+      return { ip:d.ipAddress, country:d.countryName, region:d.regionName, city:d.cityName, timezone:d.timeZone, org:'—', postal:d.zipCode||'—', lat:d.latitude, lon:d.longitude };
+    } catch(e) {}
+    throw new Error('All lookup services failed. Please try again.');
+  }
+
+  async function lookupIP() {
+    const ip = document.getElementById('ipInput').value.trim();
+    if (!ip) { showIpErr('Please enter an IP address.'); return; }
+    hide('ipErr'); hide('ipResult'); show('ipLoad');
+    try { renderIP(await fetchIP(ip)); } catch(e) { showIpErr(e.message); }
+  }
+
+  async function myIP() {
+    hide('ipErr'); hide('ipResult'); show('ipLoad');
+    document.getElementById('ipInput').value = '';
+    try {
+      const d = await fetchIP(null);
+      document.getElementById('ipInput').value = d.ip;
+      renderIP(d);
+    } catch(e) { showIpErr('Could not detect your IP.'); }
+  }
+
+  function renderIP(d) {
+    hide('ipLoad');
+    document.getElementById('ipDisplay').textContent  = d.ip||'—';
+    document.getElementById('iCountry').textContent   = d.country||'—';
+    document.getElementById('iRegion').textContent    = d.region||'—';
+    document.getElementById('iCity').textContent      = d.city||'—';
+    document.getElementById('iTimezone').textContent  = d.timezone||'—';
+    document.getElementById('iOrg').textContent       = d.org||'—';
+    document.getElementById('iPostal').textContent    = d.postal||'—';
+    const lat = parseFloat(d.lat), lon = parseFloat(d.lon);
+    document.getElementById('iCoords').textContent    = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+    document.getElementById('iMapsLink').href         = `https://www.google.com/maps?q=${lat},${lon}`;
+    show('ipResult');
+
+    setTimeout(() => {
+      if (!ipMap) {
+        ipMap = L.map('ipMap', { zoomControl:true, scrollWheelZoom:true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(ipMap);
+      }
+      ipMap.setView([lat,lon], 11);
+      if (ipMarker) ipMap.removeLayer(ipMarker);
+      if (ipCircle) ipMap.removeLayer(ipCircle);
+
+      ipMarker = L.marker([lat,lon], { icon: L.divIcon({ className:'', html:'<div class="ip-dot"></div>', iconSize:[18,18], iconAnchor:[9,9] }) }).addTo(ipMap);
+      ipMarker.bindPopup(`<b>🌐 ${d.ip}</b><br>${d.city||''}, ${d.country||''}<br><small style="color:#888">⚠ Approximate ISP area</small>`).openPopup();
+
+      // Dashed blue approximate circle (~5km)
+      ipCircle = L.circle([lat,lon], {
+        radius: 5000,
+        color: '#00e5ff', fillColor: '#00e5ff',
+        fillOpacity: 0.07, weight: 1.5, dashArray: '7 5'
+      }).addTo(ipMap);
+
+      ipMap.invalidateSize();
+    }, 200);
+  }
+
+  function showIpErr(msg) {
+    hide('ipLoad'); hide('ipResult');
+    document.getElementById('ipErrMsg').textContent = '⚠ ' + msg;
+    show('ipErr');
+  }
+
+  // ── Helpers ───────────────────────────────────────
+  function show(id) { document.getElementById(id).classList.add('visible'); }
+  function hide(id) { document.getElementById(id).classList.remove('visible'); }
+</script>
+</body>
+</html>

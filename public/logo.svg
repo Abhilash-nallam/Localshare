@@ -1,0 +1,37 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="120"
+  height="120"
+  viewBox="0 0 120 120"
+>
+  <!-- Background -->
+  <rect
+    x="10"
+    y="10"
+    width="100"
+    height="100"
+    rx="22"
+    fill="#4F46E5"
+  />
+
+  <!-- File icon -->
+  <path
+    d="M45 32h26l12 12v36a6 6 0 0 1-6 6H45a6 6 0 0 1-6-6V38a6 6 0 0 1 6-6z"
+    fill="#ffffff"
+  />
+
+  <!-- Folded corner -->
+  <path
+    d="M71 32v12h12"
+    fill="#e5e7eb"
+  />
+
+  <!-- Download arrow -->
+  <path
+    d="M60 48v18m0 0l-8-8m8 8l8-8"
+    stroke="#4F46E5"
+    stroke-width="3.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

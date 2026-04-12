@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Localshare – Temporary File Sharing Without Login</title>
+  <meta name="description" content="Share files instantly with a 6-digit code. No login needed.">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 10%,  rgba(255,100,150,0.55) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 70% at 90% 5%,   rgba(120,80,255,0.55)  0%, transparent 60%),
+        radial-gradient(ellipse 70% 60% at 85% 85%,  rgba(0,200,180,0.55)   0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 5%  90%,  rgba(255,170,0,0.50)   0%, transparent 60%),
+        radial-gradient(ellipse 80% 80% at 50% 50%,  rgba(80,140,255,0.35)  0%, transparent 70%),
+        linear-gradient(135deg, #1a0533 0%, #0d1f4a 35%, #0a2e2a 65%, #2a0d1a 100%);
+      color: #fff;
+    }
+
+    #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    .page { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px;
+      background: rgba(0,0,0,0.25); backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      flex-shrink: 0;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand img { border-radius: 9px; }
+    .brand-name {
+      font-size: 1.4rem; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(90deg, #ff6eb4, #ffd700, #7cf9ff, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .nav-btns { display: flex; gap: 10px; }
+
+    .btn-ip {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 50px; text-decoration: none;
+      font-family: 'Outfit', sans-serif; font-size: 0.84rem; font-weight: 800;
+      background: linear-gradient(135deg, #00e5c8, #00aaff);
+      color: #fff; border: none; cursor: pointer;
+      box-shadow: 0 0 18px rgba(0,229,200,0.55), 0 3px 12px rgba(0,0,0,0.3);
+      animation: glowIP 2.5s ease-in-out infinite;
+      transition: transform 0.2s;
+    }
+    .btn-ip:hover { transform: translateY(-2px) scale(1.05); }
+    @keyframes glowIP { 0%,100%{box-shadow:0 0 18px rgba(0,229,200,.55),0 3px 12px rgba(0,0,0,.3)} 50%{box-shadow:0 0 38px rgba(0,229,200,.85),0 3px 12px rgba(0,0,0,.3)} }
+
+    .btn-bits {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 50px; text-decoration: none;
+      font-family: 'Outfit', sans-serif; font-size: 0.84rem; font-weight: 800;
+      background: linear-gradient(135deg, #ffd700, #ff8c42);
+      color: #1a0000; border: none; cursor: pointer;
+      box-shadow: 0 0 18px rgba(255,215,0,0.55), 0 3px 12px rgba(0,0,0,0.3);
+      animation: glowBITS 2.5s ease-in-out infinite 1.25s;
+      transition: transform 0.2s;
+    }
+    .btn-bits:hover { transform: translateY(-2px) scale(1.05); }
+    @keyframes glowBITS { 0%,100%{box-shadow:0 0 18px rgba(255,215,0,.55),0 3px 12px rgba(0,0,0,.3)} 50%{box-shadow:0 0 38px rgba(255,215,0,.85),0 3px 12px rgba(0,0,0,.3)} }
+
+    .hero { text-align: center; padding: 18px 16px 8px; flex-shrink: 0; }
+    .hero h1 {
+      font-size: clamp(1.3rem, 3vw, 2.2rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1.2;
+      background: linear-gradient(90deg, #ffcce0, #ffd700, #7cf9ff, #d0b4ff, #ff9eb5);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-sub { font-size: 0.84rem; color: rgba(255,255,255,0.65); margin-top: 4px; font-weight: 500; }
+
+    .chips { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 8px 16px 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 50px; font-size: 0.72rem; font-weight: 700; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); color: #fff; backdrop-filter: blur(8px); }
+
+    .cards-area {
+      flex: 1; display: flex; align-items: flex-start; justify-content: center;
+      gap: 18px; padding: 10px 16px 18px; flex-wrap: wrap;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.10); backdrop-filter: blur(28px);
+      border: 1.5px solid rgba(255,255,255,0.20); border-radius: 24px;
+      width: 370px; padding: 22px 20px;
+      display: flex; flex-direction: column; gap: 13px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .card:hover { transform: translateY(-4px); }
+    .card-upload { border-color: rgba(255,120,180,0.4); }
+    .card-access { border-color: rgba(0,220,180,0.4); }
+
+    .card-head { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .card-ico { width: 44px; height: 44px; border-radius: 13px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+    .ico-up   { background: linear-gradient(135deg, #ff6eb4, #a855f7); box-shadow: 0 4px 16px rgba(255,110,180,0.5); }
+    .ico-down { background: linear-gradient(135deg, #00e5c8, #0ea5e9); box-shadow: 0 4px 16px rgba(0,229,200,0.5); }
+    .card-head-txt h2 { font-size: 1.1rem; font-weight: 800; color: #fff; }
+    .card-head-txt p  { font-size: 0.76rem; color: rgba(255,255,255,0.6); margin-top: 1px; }
+
+    .upload-zone {
+      border: 2px dashed rgba(255,120,180,0.45); border-radius: 16px;
+      background: rgba(255,120,180,0.07); transition: all 0.25s;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      background: rgba(255,120,180,0.14); border-color: rgba(255,120,180,0.85);
+    }
+    .upload-zone.shake { animation: shake 0.5s ease; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+    .dz-inner { padding: 22px 16px 10px; text-align: center; pointer-events: none; user-select: none; }
+    .dz-icon { font-size: 2.4rem; display: block; animation: floatUD 3s ease-in-out infinite; margin-bottom: 8px; }
+    @keyframes floatUD { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
+    .dz-title { font-size: 0.9rem; font-weight: 700; color: #ffc8e0; }
+    .dz-sub   { font-size: 0.74rem; color: rgba(255,255,255,0.55); margin-top: 3px; }
+
+    .browse-label {
+      display: block; width: calc(100% - 24px); margin: 6px 12px 12px;
+      padding: 10px; background: linear-gradient(135deg, #ff6eb4, #a855f7);
+      color: #fff; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.86rem;
+      text-align: center; border-radius: 12px; cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 4px 16px rgba(168,85,247,0.4);
+    }
+    .browse-label:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    #fileInput { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0,0,0,0); }
+
+    #selectedFiles { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 130px; overflow-y: auto; }
+    #selectedFiles li { background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.15); padding: 8px 11px; border-radius: 11px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #fff; animation: popIn 0.2s ease; }
+    @keyframes popIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+    .fname  { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+    .fsize  { font-size:0.72rem; color:rgba(255,255,255,0.5); flex-shrink:0; }
+    .fremove { cursor:pointer; color:#ff6eb4; font-weight:900; font-size:0.88rem; padding:1px 7px; border-radius:5px; flex-shrink:0; transition:background 0.15s; }
+    .fremove:hover { background:rgba(255,110,180,0.2); }
+
+    .prog-wrap { display:none; padding:12px 14px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); border-radius:13px; }
+    .prog-wrap.show { display:block; }
+    .prog-track { height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:8px; }
+    .prog-fill { height:100%; border-radius:3px; width:0%; transition:width 0.4s ease; background:linear-gradient(90deg,#ff6eb4,#ffd700,#7cf9ff,#a855f7); background-size:200% 100%; animation:rShimmer 1.5s linear infinite; }
+    @keyframes rShimmer { 0%{background-position:0%} 100%{background-position:200%} }
+    .prog-label { font-size:0.77rem; color:rgba(255,255,255,0.75); text-align:center; font-weight:600; }
+
+    .ty-box { display:none; padding:14px 16px; border-radius:14px; text-align:center; background:linear-gradient(135deg,rgba(0,229,200,0.12),rgba(168,85,247,0.12)); border:1px solid rgba(0,229,200,0.3); }
+    .ty-box.show { display:block; animation:popIn 0.4s ease; }
+    .ty-icon-big { font-size:1.8rem; margin-bottom:5px; }
+    .ty-head { font-size:0.92rem; font-weight:800; color:#7cf9ff; margin-bottom:3px; }
+    .ty-body { font-size:0.74rem; color:rgba(255,255,255,0.65); line-height:1.55; }
+    .ty-pills { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-top:8px; }
+    .ty-pill { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.18); border-radius:50px; padding:3px 11px; font-size:0.7rem; color:rgba(255,255,255,0.8); font-weight:600; }
+
+    .flabel { font-size:0.73rem; font-weight:800; color:rgba(255,255,255,0.55); letter-spacing:0.07em; text-transform:uppercase; }
+
+    select {
+      width:100%; padding:10px 36px 10px 14px; border-radius:12px;
+      border:1.5px solid rgba(255,255,255,0.18); font-size:0.88rem;
+      font-family:'Outfit',sans-serif; font-weight:600; color:#fff;
+      background:rgba(255,255,255,0.1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+      -webkit-appearance:none; appearance:none; outline:none; cursor:pointer; transition:all 0.2s;
+    }
+    select:focus { border-color:rgba(255,110,180,0.7); background-color:rgba(255,255,255,0.14); }
+    select option { background:#1a1040; color:#fff; }
+
+    .btn-upload {
+      width:100%; padding:13px; border:none; color:#fff;
+      font-family:'Outfit',sans-serif; font-weight:900; font-size:0.95rem;
+      border-radius:14px; cursor:pointer; transition:all 0.25s;
+      background:linear-gradient(135deg,#ff6eb4,#a855f7,#6c63ff); background-size:200% 200%;
+      animation:gradMove 3s ease infinite; box-shadow:0 5px 22px rgba(168,85,247,0.45);
+    }
+    @keyframes gradMove { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    .btn-upload:hover { transform:translateY(-2px); box-shadow:0 10px 32px rgba(168,85,247,0.6); }
+    .btn-upload:disabled { opacity:0.5; cursor:not-allowed; animation:none; }
+
+    .result-box { background:rgba(0,229,200,0.09); border:1.5px solid rgba(0,229,200,0.28); border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:11px; animation:popIn 0.4s ease; }
+    .result-label { font-size:0.84rem; font-weight:800; color:#7cf9ff; }
+    .url-row { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:11px; padding:9px 13px; }
+    .url-row span { flex:1; font-size:0.7rem; color:#d0b4ff; word-break:break-all; font-family:'JetBrains Mono',monospace; }
+    .copy-btn { padding:7px 16px; font-size:0.77rem; border-radius:9px; background:linear-gradient(135deg,#00e5c8,#0ea5e9); color:#fff; font-family:'Outfit',sans-serif; font-weight:800; border:none; cursor:pointer; flex-shrink:0; transition:all 0.2s; }
+    .copy-btn:hover { transform:translateY(-1px); }
+
+    .code-show { display:flex; flex-direction:column; align-items:center; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); border-radius:14px; padding:12px 16px; }
+    .code-lbl { font-size:0.7rem; font-weight:800; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px; }
+    .code-val { font-family:'JetBrains Mono',monospace; font-size:2.2rem; font-weight:700; letter-spacing:0.28em; background:linear-gradient(90deg,#ff6eb4,#ffd700,#7cf9ff,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .code-hint { font-size:0.68rem; color:rgba(255,255,255,0.45); margin-top:3px; }
+
+    input[type="text"] {
+      width:100%; padding:11px 14px; border-radius:13px;
+      border:1.5px solid rgba(255,255,255,0.18); font-size:0.9rem;
+      font-family:'Outfit',sans-serif; font-weight:600; color:#fff;
+      background:rgba(255,255,255,0.1); outline:none; transition:all 0.2s;
+    }
+    input[type="text"]::placeholder { color:rgba(255,255,255,0.32); font-weight:400; }
+    input[type="text"]:focus { border-color:rgba(0,229,200,0.7); background:rgba(0,229,200,0.08); box-shadow:0 0 0 3px rgba(0,229,200,0.14); }
+
+    .btn-access {
+      width:100%; padding:13px; border:none; color:#fff;
+      font-family:'Outfit',sans-serif; font-weight:900; font-size:0.95rem;
+      border-radius:14px; cursor:pointer; transition:all 0.25s;
+      background:linear-gradient(135deg,#00e5c8,#0ea5e9,#7c3aed); background-size:200% 200%;
+      animation:gradMove 3s ease infinite 1s; box-shadow:0 5px 22px rgba(0,200,200,0.4);
+    }
+    .btn-access:hover { transform:translateY(-2px); box-shadow:0 10px 32px rgba(0,229,200,0.55); }
+
+    .access-note { background:rgba(0,229,200,0.08); border:1px solid rgba(0,229,200,0.22); border-radius:13px; padding:11px 14px; font-size:0.75rem; color:rgba(255,255,255,0.65); text-align:center; line-height:1.6; }
+    .access-note strong { color:#7cf9ff; }
+
+    #fileList { display:flex; flex-direction:column; gap:7px; }
+    .file-dl-item { display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(0,229,200,0.08); border:1px solid rgba(0,229,200,0.18); border-radius:12px; padding:10px 13px; animation:popIn 0.2s ease; }
+    .file-dl-item span { font-size:0.8rem; color:#d0f8f5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-weight:600; }
+    .file-dl-item a { background:linear-gradient(135deg,#00e5c8,#0ea5e9); color:#fff; text-decoration:none; padding:6px 14px; border-radius:9px; font-size:0.76rem; font-weight:800; flex-shrink:0; transition:opacity 0.2s; display:inline-block; }
+    .file-dl-item a:hover { opacity:0.84; }
+
+    .error-msg { color:#ff9eb5; font-size:0.82rem; text-align:center; padding:12px; background:rgba(255,77,141,0.1); border-radius:11px; border:1px solid rgba(255,77,141,0.25); }
+
+    .below { position:relative; z-index:1; }
+
+    .about { background:rgba(0,0,0,0.22); backdrop-filter:blur(10px); border-top:1px solid rgba(255,255,255,0.1); padding:40px 20px; }
+    .about-title { text-align:center; font-size:1.4rem; font-weight:900; margin-bottom:6px; background:linear-gradient(90deg,#ff6eb4,#ffd700,#7cf9ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .about-sub { text-align:center; font-size:0.85rem; color:rgba(255,255,255,0.55); margin-bottom:28px; }
+    .about-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; max-width:860px; margin:0 auto; }
+    .about-card { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:18px; padding:20px; transition:all 0.3s; }
+    .about-card:hover { background:rgba(255,255,255,0.12); transform:translateY(-3px); }
+    .about-card-ico { font-size:1.7rem; margin-bottom:9px; }
+    .about-card h3 { font-size:0.94rem; font-weight:800; color:#fff; margin-bottom:6px; }
+    .about-card p  { font-size:0.79rem; color:rgba(255,255,255,0.6); line-height:1.65; }
+
+    .site-footer { background:rgba(0,0,0,0.35); border-top:1px solid rgba(255,255,255,0.07); padding:32px 20px 20px; }
+    .footer-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:24px; max-width:860px; margin:0 auto 24px; }
+    .footer-col h4 { font-size:0.84rem; font-weight:800; color:#fff; margin-bottom:10px; }
+    .footer-col p  { font-size:0.77rem; color:rgba(255,255,255,0.5); line-height:1.7; }
+    .footer-col ul { list-style:none; display:flex; flex-direction:column; gap:6px; }
+    .footer-col li { font-size:0.77rem; color:rgba(255,255,255,0.5); }
+    .footer-col a  { color:#7cf9ff; text-decoration:none; }
+    .footer-col a:hover { text-decoration:underline; }
+    .footer-bottom { border-top:1px solid rgba(255,255,255,0.07); padding-top:16px; text-align:center; font-size:0.72rem; color:rgba(255,255,255,0.38); max-width:860px; margin:0 auto; }
+    .footer-bottom a { color:#d0b4ff; }
+
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-thumb { background:rgba(255,110,180,0.4); border-radius:3px; }
+
+    @media (max-width:620px) {
+      .card { width:100%; }
+      .navbar { padding:12px 14px; flex-wrap:wrap; gap:8px; }
+      .btn-ip,.btn-bits { font-size:0.77rem; padding:7px 12px; }
+      .hero { padding:14px 14px 6px; }
+      .hero h1 { font-size:1.4rem; }
+      .cards-area { padding:8px 12px 12px; gap:14px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="page">
+
+  <nav class="navbar">
+    <div class="brand">
+      <img src="logo.svg" alt="Localshare" width="34" height="34">
+      <span class="brand-name">Localshare</span>
+    </div>
+    <div class="nav-btns">
+      <a href="ip_locator.html" target="_blank" class="btn-ip">🌐 IP Locator</a>
+      <a href="https://bitsresourcesr22.free.nf/" target="_blank" class="btn-bits">🏠 Back to BITS</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Share Files Instantly · No Login · No Fuss</h1>
+    <p class="hero-sub">Drop files → Get a 6-digit code → Share with anyone · Auto-deletes on expiry</p>
+  </section>
+
+  <div class="chips">
+    <span class="chip">🔒 No Login</span>
+    <span class="chip">⚡ Instant</span>
+    <span class="chip">🗑️ Auto-Deletes</span>
+    <span class="chip">🛡️ No Tracking</span>
+    <span class="chip">📱 Any Device</span>
+  </div>
+
+  <div class="cards-area">
+
+    <!-- SHARE CARD -->
+    <div class="card card-upload">
+      <div class="card-head">
+        <div class="card-ico ico-up">📤</div>
+        <div class="card-head-txt">
+          <h2>Share Files</h2>
+          <p>Drag &amp; drop or click to browse</p>
+        </div>
+      </div>
+
+      <div class="upload-zone" id="uploadArea">
+        <div class="dz-inner">
+          <span class="dz-icon">📁</span>
+          <p class="dz-title">Drag &amp; drop files here</p>
+          <p class="dz-sub">Any file type · Secure · Temporary</p>
+        </div>
+        <label class="browse-label" for="fileInput">📂 Browse &amp; Add Files</label>
+      </div>
+
+      <input type="file" id="fileInput" multiple>
+
+      <ul id="selectedFiles"></ul>
+
+      <div class="prog-wrap" id="uploadProgress">
+        <div class="prog-track"><div class="prog-fill" id="progressFill"></div></div>
+        <div class="prog-label" id="progressLabel">Uploading…</div>
+      </div>
+
+      <div class="ty-box" id="thankyouMsg">
+        <div class="ty-icon-big">🎉</div>
+        <div class="ty-head">Thank you for choosing Localshare!</div>
+        <div class="ty-body">Files are uploading securely. We never store, analyze, or share your data.</div>
+        <div class="ty-pills">
+          <span class="ty-pill">✅ Temp storage</span>
+          <span class="ty-pill">✅ No account</span>
+          <span class="ty-pill">✅ Auto-deleted</span>
+        </div>
+      </div>
+
+      <label class="flabel" for="duration">Access Duration</label>
+      <select id="duration">
+        <option value="24h">⏱️ 24 Hours</option>
+        <option value="3d">📅 3 Days</option>
+        <option value="7d">🗓️ 7 Days</option>
+      </select>
+
+      <button class="btn-upload" id="generateBtn">⚡ Generate Share Link</button>
+
+      <div id="resultBox" class="result-box" style="display:none;">
+        <p class="result-label">✅ Your link is ready — share it!</p>
+        <div class="url-row">
+          <span id="generatedUrl"></span>
+          <button class="copy-btn" id="copyBtn">Copy</button>
+        </div>
+        <div class="code-show">
+          <span class="code-lbl">6-Digit Code</span>
+          <span class="code-val" id="generatedCode"></span>
+          <span class="code-hint">Share this code to give access</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCESS CARD -->
+    <div class="card card-access">
+      <div class="card-head">
+        <div class="card-ico ico-down">📥</div>
+        <div class="card-head-txt">
+          <h2>Access Files</h2>
+          <p>Paste a link or enter a 6-digit code</p>
+        </div>
+      </div>
+
+      <div class="access-note" id="accessNote">
+        <strong>🔐 Trusted &amp; Secure</strong><br>
+        Only the correct code unlocks files. We never log access attempts.
+      </div>
+
+      <label class="flabel" for="accessInput">Share Link or Code</label>
+      <input type="text" id="accessInput" placeholder="e.g. 483920  or  paste full link…" autocomplete="off" spellcheck="false">
+      <button class="btn-access" id="accessBtn">🔍 Access Files</button>
+      <div id="fileList"></div>
+    </div>
+
+  </div>
+
+  <div class="below">
+    <section class="about">
+      <p class="about-title">Why Localshare?</p>
+      <p class="about-sub">Built for students, labs, and everyone who values speed &amp; privacy.</p>
+      <div class="about-grid">
+        <div class="about-card"><div class="about-card-ico">🚀</div><h3>Lightning Fast</h3><p>Upload in seconds, share with a code. No registration delays — just upload and go.</p></div>
+        <div class="about-card"><div class="about-card-ico">🛡️</div><h3>Privacy First</h3><p>No login, no email, no permanent storage. Files are never analyzed or shared.</p></div>
+        <div class="about-card"><div class="about-card-ico">⏳</div><h3>Auto-Cleanup</h3><p>Files delete automatically after your chosen expiry window. Nothing lingers.</p></div>
+        <div class="about-card"><div class="about-card-ico">🎓</div><h3>Student Friendly</h3><p>Perfect for college labs, group projects, and quick transfers on shared devices.</p></div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col"><h4>Localshare</h4><p>Fast and secure temporary file sharing. No login. Auto-expires.</p></div>
+        <div class="footer-col"><h4>Features</h4><ul><li>✔ No login required</li><li>✔ Time-limited access</li><li>✔ Any device, any file</li><li>✔ Auto file deletion</li></ul></div>
+        <div class="footer-col"><h4>Quick Links</h4><ul><li><a href="ip_locator.html" target="_blank">🌐 IP Address Locator</a></li><li><a href="https://bitsresourcesr22.free.nf/" target="_blank">🏠 BITS Resources</a></li></ul></div>
+        <div class="footer-col"><h4>Use Cases</h4><ul><li>Students &amp; colleges</li><li>Office file sharing</li><li>Temporary transfers</li><li>Public labs</li></ul></div>
+      </div>
+      <div class="footer-bottom">© 2026 Localshare · Temporary File Sharing Without Login · <a href="mailto:bitsresourcesr22@gmail.com">bitsresourcesr22@gmail.com</a></div>
+    </footer>
+  </div>
+
+</div>
+
+<script>
+/* RAINBOW CANVAS BACKGROUND */
+(function(){
+  var canvas = document.getElementById('bg-canvas');
+  var ctx = canvas.getContext('2d');
+  var orbs = [
+    {x:0.15,y:0.15,r:0.35,c:[255,80,160],s:0.0004,p:0},
+    {x:0.85,y:0.10,r:0.30,c:[120,80,255],s:0.0003,p:2},
+    {x:0.80,y:0.80,r:0.28,c:[0,210,180], s:0.0005,p:4},
+    {x:0.10,y:0.85,r:0.25,c:[255,170,0], s:0.00035,p:1},
+    {x:0.50,y:0.50,r:0.22,c:[80,160,255],s:0.00045,p:3},
+    {x:0.35,y:0.65,r:0.18,c:[255,80,80], s:0.0006,p:5},
+    {x:0.65,y:0.30,r:0.20,c:[80,255,160],s:0.0004,p:1.5}
+  ];
+  function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; canvas.style.cssText='position:fixed;inset:0;z-index:0;pointer-events:none;'; }
+  var t=0;
+  function draw(){
+    t++;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    orbs.forEach(function(o){
+      var dx=Math.sin(t*o.s+o.p)*0.08, dy=Math.cos(t*o.s*1.3+o.p)*0.07;
+      var cx=(o.x+dx)*canvas.width, cy=(o.y+dy)*canvas.height;
+      var rad=o.r*Math.min(canvas.width,canvas.height);
+      var g=ctx.createRadialGradient(cx,cy,0,cx,cy,rad);
+      g.addColorStop(0,'rgba('+o.c[0]+','+o.c[1]+','+o.c[2]+',0.28)');
+      g.addColorStop(0.5,'rgba('+o.c[0]+','+o.c[1]+','+o.c[2]+',0.11)');
+      g.addColorStop(1,'rgba('+o.c[0]+','+o.c[1]+','+o.c[2]+',0)');
+      ctx.beginPath();
+      ctx.ellipse(cx,cy,rad,rad*0.75,t*0.0003+o.p,0,Math.PI*2);
+      ctx.fillStyle=g; ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',resize);
+  resize(); draw();
+})();
+</script>
+
+<script>
+/* ALL INTERACTIVE LOGIC */
+var selectedFiles = [];
+
+document.addEventListener('DOMContentLoaded', function(){
+
+  var fileInput   = document.getElementById('fileInput');
+  var uploadArea  = document.getElementById('uploadArea');
+  var generateBtn = document.getElementById('generateBtn');
+  var copyBtn     = document.getElementById('copyBtn');
+  var accessInput = document.getElementById('accessInput');
+  var accessBtn   = document.getElementById('accessBtn');
+
+  /* File input change */
+  fileInput.addEventListener('change', function(e){
+    var files = Array.from(e.target.files || []);
+    if(files.length > 0) addFiles(files);
+    e.target.value = '';
+  });
+
+  /* Drag & drop */
+  uploadArea.addEventListener('dragenter', function(e){ e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragover',  function(e){ e.preventDefault(); e.stopPropagation(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', function(e){ if(!uploadArea.contains(e.relatedTarget)) uploadArea.classList.remove('drag-over'); });
+  uploadArea.addEventListener('drop', function(e){
+    e.preventDefault(); e.stopPropagation();
+    uploadArea.classList.remove('drag-over');
+    var files = Array.from(e.dataTransfer.files || []);
+    if(files.length > 0) addFiles(files);
+  });
+
+  generateBtn.addEventListener('click', uploadFiles);
+  if(copyBtn) copyBtn.addEventListener('click', copyUrl);
+  if(accessBtn) accessBtn.addEventListener('click', accessFilesHandler);
+  if(accessInput) accessInput.addEventListener('keydown', function(e){ if(e.key==='Enter') accessFilesHandler(); });
+});
+
+function addFiles(newFiles){
+  var added = 0;
+  newFiles.forEach(function(file){
+    var dup = selectedFiles.some(function(f){ return f.name===file.name && f.size===file.size; });
+    if(!dup){ selectedFiles.push(file); added++; }
+  });
+  if(added > 0){ renderFileList(); showToast('✅ '+added+' file'+(added>1?'s':'')+' added','success'); }
+}
+
+function renderFileList(){
+  var list = document.getElementById('selectedFiles');
+  if(!list) return;
+  list.innerHTML = '';
+  selectedFiles.forEach(function(file, idx){
+    var li = document.createElement('li');
+    li.innerHTML =
+      '<span class="fname" title="'+escHtml(file.name)+'">'+getIcon(file.name)+' '+truncate(escHtml(file.name),30)+'</span>'+
+      '<span class="fsize">'+formatBytes(file.size)+'</span>'+
+      '<span class="fremove" title="Remove">✕</span>';
+    li.querySelector('.fremove').addEventListener('click', function(){ removeFile(idx); });
+    list.appendChild(li);
+  });
+}
+
+function removeFile(idx){ selectedFiles.splice(idx,1); renderFileList(); }
+
+async function uploadFiles(){
+  if(selectedFiles.length === 0){
+    var area = document.getElementById('uploadArea');
+    if(area){ area.classList.add('shake'); setTimeout(function(){ area.classList.remove('shake'); },600); }
+    showToast('Please add at least one file!','error'); return;
+  }
+
+  var btn=document.getElementById('generateBtn'), resultBox=document.getElementById('resultBox');
+  var progWrap=document.getElementById('uploadProgress'), progFill=document.getElementById('progressFill'), progLabel=document.getElementById('progressLabel');
+  var tyBox=document.getElementById('thankyouMsg');
+
+  btn.disabled=true; btn.textContent='Uploading…';
+  if(resultBox) resultBox.style.display='none';
+  if(progWrap) progWrap.classList.add('show');
+  if(progFill) progFill.style.width='0%';
+  if(progLabel) progLabel.textContent='Preparing upload…';
+  if(tyBox) tyBox.classList.add('show');
+
+  var fakeP=0;
+  var iv=setInterval(function(){
+    fakeP=Math.min(fakeP+Math.random()*6,88);
+    if(progFill) progFill.style.width=fakeP+'%';
+    if(progLabel) progLabel.textContent='Uploading… '+Math.round(fakeP)+'%';
+  },300);
+
+  var fd=new FormData();
+  selectedFiles.forEach(function(f){ fd.append('files',f); });
+  fd.append('duration',document.getElementById('duration').value);
+
+  try{
+    var res=await fetch('/upload',{method:'POST',body:fd});
+    clearInterval(iv);
+    if(!res.ok){ var msg='Server error ('+res.status+')'; try{var d=await res.json();msg=d.error||msg;}catch(e){} throw new Error(msg); }
+    var data=await res.json();
+    if(data.error) throw new Error(data.error);
+
+    if(progFill) progFill.style.width='100%';
+    if(progLabel) progLabel.textContent='✅ Upload complete!';
+
+    var urlEl=document.getElementById('generatedUrl'), codeEl=document.getElementById('generatedCode');
+    if(urlEl) urlEl.textContent=data.url;
+    if(codeEl) codeEl.textContent=data.code;
+
+    setTimeout(function(){
+      if(progWrap) progWrap.classList.remove('show');
+      if(resultBox) resultBox.style.display='flex';
+      if(tyBox) tyBox.classList.remove('show');
+    },800);
+
+    showToast('✅ Link generated!','success');
+    selectedFiles=[];
+    renderFileList();
+
+  }catch(err){
+    clearInterval(iv);
+    if(progWrap) progWrap.classList.remove('show');
+    if(tyBox) tyBox.classList.remove('show');
+    showToast('❌ '+(err.message||'Upload failed. Try again.'),'error');
+  }finally{
+    btn.disabled=false; btn.textContent='⚡ Generate Share Link';
+  }
+}
+
+function copyUrl(){
+  var urlEl=document.getElementById('generatedUrl');
+  var text=urlEl?urlEl.textContent.trim():'';
+  if(!text){ showToast('Generate a link first!','error'); return; }
+  var btn=document.getElementById('copyBtn');
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(function(){ flashCopied(btn); }).catch(function(){ legacyCopy(text,btn); });
+  } else { legacyCopy(text,btn); }
+}
+
+function legacyCopy(text,btn){
+  var ta=document.createElement('textarea');
+  ta.value=text; ta.style.cssText='position:fixed;opacity:0;top:0;left:0;';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); flashCopied(btn); }
+  catch(e){ showToast('Copy failed — please copy manually','error'); }
+  document.body.removeChild(ta);
+}
+
+function flashCopied(btn){
+  if(!btn) return;
+  var orig=btn.textContent; btn.textContent='Copied ✓'; btn.style.background='#16a34a';
+  setTimeout(function(){ btn.textContent=orig; btn.style.background=''; },2000);
+}
+
+async function accessFilesHandler(){
+  var inputEl=document.getElementById('accessInput'), listEl=document.getElementById('fileList');
+  if(!inputEl||!listEl) return;
+  var raw=inputEl.value.trim();
+  listEl.innerHTML='';
+  if(!raw){ listEl.innerHTML='<div class="error-msg">Please enter a link or 6-digit code.</div>'; return; }
+
+  var code, urlMatch=raw.match(/\/access\/(\d{6})/);
+  if(urlMatch){ code=urlMatch[1]; }
+  else if(/^\d{6}$/.test(raw)){ code=raw; }
+  else{ listEl.innerHTML='<div class="error-msg">Enter the full share link or a 6-digit code.</div>'; return; }
+
+  listEl.innerHTML='<p style="color:rgba(255,255,255,0.5);font-size:0.83rem;text-align:center;padding:12px">⏳ Fetching files…</p>';
+
+  try{
+    var res=await fetch('/api/access/'+code), data=await res.json();
+    listEl.innerHTML='';
+    if(data.error){ listEl.innerHTML='<div class="error-msg">'+escHtml(data.error)+'</div>'; return; }
+
+    data.files.forEach(function(file){
+      var item=document.createElement('div'); item.className='file-dl-item';
+      item.innerHTML='<span title="'+escHtml(file.name)+'">'+getIcon(file.name)+' '+escHtml(file.name)+(file.size?' <small style="opacity:.5">('+formatBytes(file.size)+')</small>':'')+'</span><a href="'+escHtml(file.url)+'" download="'+escHtml(file.name)+'">⬇ Download</a>';
+      listEl.appendChild(item);
+    });
+
+    if(data.files.length>1){
+      var dlAll=document.createElement('button');
+      dlAll.textContent='⬇ Download All';
+      dlAll.style.cssText='margin-top:8px;width:100%;padding:10px;border:none;border-radius:11px;background:linear-gradient(135deg,#00e5c8,#0ea5e9);color:#fff;font-family:Outfit,sans-serif;font-weight:800;font-size:0.85rem;cursor:pointer;';
+      dlAll.addEventListener('click',function(){
+        data.files.forEach(function(f,i){ setTimeout(function(){ var a=document.createElement('a'); a.href=f.url; a.download=f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); },i*500); });
+      });
+      listEl.appendChild(dlAll);
+    }
+
+    var note=document.getElementById('accessNote');
+    if(note){ note.innerHTML='<strong>✅ Thank you for using Localshare!</strong><br>Files fetched securely. Your privacy is protected.'; setTimeout(function(){ note.innerHTML='<strong>🔐 Trusted &amp; Secure</strong><br>Only the correct code unlocks files. We never log access attempts.'; },4000); }
+
+  }catch(err){ listEl.innerHTML='<div class="error-msg">Could not reach server. Please try again.</div>'; console.error(err); }
+}
+
+function getIcon(name){
+  var ext=(name||'').split('.').pop().toLowerCase();
+  var m={pdf:'📄',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp4:'🎬',mov:'🎬',avi:'🎬',mp3:'🎵',wav:'🎵',zip:'🗜️',rar:'🗜️','7z':'🗜️',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',txt:'📃',js:'💻',ts:'💻',html:'🌐',css:'🎨',py:'🐍'};
+  return m[ext]||'📁';
+}
+function formatBytes(b){ if(!b)return'0 B'; if(b<1024)return b+' B'; if(b<1048576)return(b/1024).toFixed(1)+' KB'; return(b/1048576).toFixed(1)+' MB'; }
+function truncate(s,max){ return s.length>max?s.slice(0,max-1)+'…':s; }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function showToast(msg,type){
+  var old=document.getElementById('ls-toast'); if(old)old.remove();
+  var t=document.createElement('div'); t.id='ls-toast'; t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(type==='error'?'linear-gradient(135deg,#dc2626,#9b1c1c)':'linear-gradient(135deg,#059669,#0d9488)')+';color:#fff;padding:11px 26px;border-radius:50px;font-size:0.88rem;font-weight:700;z-index:9999;font-family:Outfit,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,0.35);white-space:nowrap;';
+  document.body.appendChild(t); setTimeout(function(){t.remove();},3000);
+}
+</script>
+
+</body>
+</html>
