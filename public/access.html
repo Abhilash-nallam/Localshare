@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Access Files — Localshare</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #6c63ff;
+      --teal: #00d4b4;
+      --rose: #ff4d8d;
+      --gold: #ffd700;
+      --muted: rgba(220,215,255,0.52);
+      --font: 'Outfit', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background: #060614;
+      color: #f0f0ff;
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    #starfield { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    .aurora { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .ab { position: absolute; border-radius: 50%; filter: blur(110px); mix-blend-mode: screen; animation: auroraFloat 20s ease-in-out infinite alternate; }
+    .ab1 { width: 70vw; height: 60vh; background: radial-gradient(ellipse, rgba(108,99,255,0.18) 0%, transparent 70%); top: -20%; right: -10%; animation-duration: 22s; }
+    .ab2 { width: 55vw; height: 55vh; background: radial-gradient(ellipse, rgba(0,212,180,0.13) 0%, transparent 70%); bottom: -15%; left: -8%; animation-duration: 19s; animation-delay: -9s; }
+    @keyframes auroraFloat { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(3vw,-3vh) scale(1.06)} 100%{transform:translate(-3vw,4vh) scale(0.95)} }
+
+    .grid-bg {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(108,99,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(108,99,255,0.035) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* NAV */
+    .topnav {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 28px;
+      background: rgba(6,6,20,0.65); backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(108,99,255,0.13);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .brand-name {
+      font-size: 1.3rem; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff, #c4b5fd 50%, #67e8f9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #6c63ff, #ff4d8d); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+
+    .btn-share {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 20px; border-radius: 50px;
+      font-family: var(--font); font-size: 0.86rem; font-weight: 700;
+      text-decoration: none; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #6c63ff, #ff4d8d);
+      color: #fff; box-shadow: 0 0 20px rgba(108,99,255,0.38), 0 4px 14px rgba(0,0,0,0.3);
+      animation: shareGlow 2.8s ease-in-out infinite; transition: all 0.25s;
+    }
+    .btn-share:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(108,99,255,0.6), 0 8px 24px rgba(0,0,0,0.4); }
+    @keyframes shareGlow { 0%,100%{box-shadow:0 0 20px rgba(108,99,255,0.38),0 4px 14px rgba(0,0,0,0.3)} 50%{box-shadow:0 0 44px rgba(108,99,255,0.6),0 4px 14px rgba(0,0,0,0.3)} }
+
+    /* CONTENT */
+    .wrap { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; padding: 0 24px 60px; }
+
+    /* THANK YOU BANNER — shown when page loads with a valid code */
+    .ty-banner {
+      background: linear-gradient(135deg, rgba(0,212,180,0.1), rgba(108,99,255,0.1));
+      border: 1px solid rgba(0,212,180,0.28); border-radius: 18px;
+      padding: 22px 26px; text-align: center; margin: 32px 0 20px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .ty-icon { font-size: 2.4rem; margin-bottom: 8px; }
+    .ty-head { font-size: 1.1rem; font-weight: 800; color: #6ee7d4; margin-bottom: 5px; }
+    .ty-sub  { font-size: 0.82rem; color: var(--muted); line-height: 1.65; }
+    .ty-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+    .ty-pill { background: rgba(0,212,180,0.1); border: 1px solid rgba(0,212,180,0.22); border-radius: 50px; padding: 5px 14px; font-size: 0.74rem; color: #6ee7d4; font-weight: 600; }
+
+    /* STATES */
+    .state { text-align: center; padding: 80px 24px; animation: fadeUp 0.5s ease both; }
+    .state-icon { font-size: 3.5rem; margin-bottom: 16px; }
+    .state h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 8px; }
+    .state p { font-family: var(--mono); font-size: 0.79rem; color: var(--muted); margin-bottom: 24px; }
+
+    .spinner {
+      width: 44px; height: 44px; border: 3px solid rgba(108,99,255,0.2); border-top-color: #6c63ff;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+
+    /* CODE HEADER */
+    .code-header {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(108,99,255,0.18);
+      border-radius: 20px; padding: 22px 24px; margin-bottom: 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      animation: fadeUp 0.5s ease both; position: relative; overflow: hidden;
+    }
+    .code-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(108,99,255,0.4), transparent); }
+    .code-meta h3 { font-size: 0.74rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .code-val { font-family: var(--mono); font-size: 2rem; font-weight: 700; letter-spacing: 0.25em; background: linear-gradient(135deg, #6c63ff, #ff4d8d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .expiry { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .expiry span:first-child { font-family: var(--mono); font-size: 0.69rem; color: var(--muted); }
+    .expiry span:last-child  { font-family: var(--mono); font-size: 0.82rem; color: #6ee7d4; font-weight: 600; }
+
+    .file-count { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); margin-bottom: 12px; padding: 0 2px; animation: fadeUp 0.5s 0.1s ease both; }
+
+    /* FILE CARDS */
+    .files-grid { display: flex; flex-direction: column; gap: 10px; animation: fadeUp 0.5s 0.15s ease both; }
+    .file-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px; padding: 18px 20px; display: flex; align-items: center; gap: 16px;
+      transition: all 0.2s;
+    }
+    .file-card:hover { border-color: rgba(0,212,180,0.28); background: rgba(0,212,180,0.04); transform: translateY(-1px); }
+    .fc-icon { width: 50px; height: 50px; flex-shrink: 0; background: linear-gradient(135deg, rgba(108,99,255,0.15), rgba(0,212,180,0.15)); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .fc-info { flex: 1; overflow: hidden; }
+    .fc-name { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+    .fc-meta { font-family: var(--mono); font-size: 0.71rem; color: var(--muted); }
+
+    .dl-btn {
+      background: linear-gradient(135deg, #00d4b4, #0891b2); border: none; border-radius: 12px;
+      padding: 11px 22px; font-family: var(--font); font-size: 0.83rem; font-weight: 700;
+      color: #fff; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(0,212,180,0.28);
+    }
+    .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,212,180,0.42); }
+    .dl-btn.downloading { opacity: 0.65; cursor: wait; }
+
+    .dl-all-wrap { margin-top: 18px; animation: fadeUp 0.5s 0.2s ease both; }
+    .dl-all-btn {
+      width: 100%; background: transparent; border: 1px solid rgba(108,99,255,0.25);
+      border-radius: 14px; padding: 14px; font-family: var(--font); font-size: 0.9rem;
+      font-weight: 700; color: #c4b5fd; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .dl-all-btn:hover { border-color: rgba(108,99,255,0.6); color: #fff; background: rgba(108,99,255,0.1); }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px; margin-top: 22px;
+      font-family: var(--mono); font-size: 0.77rem; color: var(--muted);
+      text-decoration: none; transition: color 0.2s; animation: fadeUp 0.5s 0.3s ease both;
+    }
+    .back-link:hover { color: #6c63ff; }
+
+    .btn-primary {
+      display: inline-block; background: linear-gradient(135deg, #6c63ff, #ff4d8d);
+      border: none; border-radius: 12px; padding: 13px 30px;
+      font-family: var(--font); font-size: 0.92rem; font-weight: 800;
+      color: #fff; cursor: pointer; text-decoration: none; transition: all 0.2s;
+      box-shadow: 0 6px 22px rgba(108,99,255,0.38);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(108,99,255,0.52); }
+
+    .page-footer { border-top: 1px solid rgba(255,255,255,0.07); padding: 22px 0; text-align: center; font-family: var(--mono); font-size: 0.71rem; color: var(--muted); margin-top: 24px; }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.45); border-radius: 3px; }
+
+    @media (max-width: 560px) {
+      .topnav { padding: 12px 16px; }
+      .fc-icon { width: 40px; height: 40px; font-size: 18px; border-radius: 10px; }
+      .dl-btn  { padding: 9px 16px; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+<div class="aurora"><div class="ab ab1"></div><div class="ab ab2"></div></div>
+<div class="grid-bg"></div>
+
+<nav class="topnav">
+  <a href="/" class="brand">
+    <div class="brand-icon">⚡</div>
+    <span class="brand-name">Localshare</span>
+  </a>
+  <a href="/" class="btn-share">📤 Share Files</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- Thank You Banner — always shown for trust -->
+  <div class="ty-banner">
+    <div class="ty-icon">🎉</div>
+    <div class="ty-head">Thank you for choosing Localshare!</div>
+    <div class="ty-sub">Your files are being fetched securely. We never log your access or share your data with anyone.</div>
+    <div class="ty-pills">
+      <span class="ty-pill">✅ Zero logging</span>
+      <span class="ty-pill">✅ No account needed</span>
+      <span class="ty-pill">✅ Temporary storage only</span>
+    </div>
+  </div>
+
+  <div id="mainContent">
+    <div class="state">
+      <div class="spinner"></div>
+      <p>Fetching your files securely…</p>
+    </div>
+  </div>
+
+  <div class="page-footer">Localshare — Fast. Temporary. No account needed.</div>
+</div>
+
+<script>
+/* STARFIELD */
+(function(){
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  function init(){
+    stars = [];
+    const n = Math.floor(canvas.width * canvas.height / 4000);
+    for(let i = 0; i < n; i++) stars.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*1.3+0.2, a: Math.random()*0.6+0.15, tw: Math.random()*Math.PI*2, sp: Math.random()*0.3+0.05 });
+  }
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    stars.forEach(s=>{ s.tw+=s.sp*0.04; const a=s.a*(0.55+0.45*Math.sin(s.tw)); ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fillStyle=`rgba(210,200,255,${a})`; ctx.fill(); });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',()=>{ resize(); init(); });
+  resize(); init(); draw();
+})();
+</script>
+
+<script>
+  const code = window.location.pathname.split('/access/')[1];
+  const mainContent = document.getElementById('mainContent');
+
+  function getFileIcon(name) {
+    const ext = (name || '').split('.').pop().toLowerCase();
+    const map = { pdf:'📄', jpg:'🖼️', jpeg:'🖼️', png:'🖼️', gif:'🖼️', webp:'🖼️', mp4:'🎬', mov:'🎬', avi:'🎬', mp3:'🎵', wav:'🎵', zip:'🗜️', rar:'🗜️', '7z':'🗜️', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', ppt:'📑', pptx:'📑', txt:'📃', js:'💻', ts:'💻', html:'🌐', css:'🎨', py:'🐍' };
+    return map[ext] || '📁';
+  }
+
+  function formatBytes(b) {
+    if (!b) return '';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  async function forceDownload(url, filename, btn) {
+    if (btn) { btn.classList.add('downloading'); btn.textContent = '⏳ Downloading…'; }
+    try {
+      // Fetch through our server proxy (same-origin), then trigger save-as via blob URL.
+      // This works even when the browser blocks <a download> on cross-origin URLs.
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Server returned ' + response.status);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = filename; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Download failed: ' + err.message + '\n\nTry right-clicking the button and "Save link as…"');
+    } finally {
+      if (btn) { setTimeout(() => { btn.classList.remove('downloading'); btn.innerHTML = '↓ Download'; }, 1500); }
+    }
+  }
+
+  async function loadFiles() {
+    if (!code) { showError('No code found', 'This link appears to be invalid.'); return; }
+    try {
+      const res  = await fetch('/api/access/' + code);
+      const data = await res.json();
+      if (data.error) { data.error.includes('expired') ? showExpired() : showError('Invalid Code', data.error); return; }
+      showFiles(data.files);
+    } catch (err) {
+      showError('Connection Error', 'Could not reach the server. Please try again.');
+    }
+  }
+
+  function showFiles(files) {
+    mainContent.innerHTML = `
+      <div class="code-header">
+        <div class="code-meta">
+          <h3>Share Code</h3>
+          <div class="code-val">${escapeHtml(code)}</div>
+        </div>
+        <div class="expiry">
+          <span>Status</span>
+          <span>● Active</span>
+        </div>
+      </div>
+
+      <div class="file-count">${files.length} file${files.length !== 1 ? 's' : ''} ready to download</div>
+
+      <div class="files-grid" id="filesGrid">
+        ${files.map((file, idx) => `
+          <div class="file-card">
+            <div class="fc-icon">${getFileIcon(file.name)}</div>
+            <div class="fc-info">
+              <div class="fc-name">${escapeHtml(file.name)}</div>
+              <div class="fc-meta">${formatBytes(file.size)}</div>
+            </div>
+            <button class="dl-btn" data-url="${escapeHtml(file.url)}" data-name="${escapeHtml(file.name)}" data-idx="${idx}">
+              ↓ Download
+            </button>
+          </div>
+        `).join('')}
+      </div>
+
+      ${files.length > 1 ? `
+      <div class="dl-all-wrap">
+        <button class="dl-all-btn" id="dlAllBtn">↓ Download All Files</button>
+      </div>` : ''}
+
+      <a href="/" class="back-link">← Share your own files</a>
+    `;
+
+    document.querySelectorAll('.dl-btn').forEach(btn => {
+      btn.addEventListener('click', () => forceDownload(btn.dataset.url, btn.dataset.name, btn));
+    });
+
+    if (dlAllBtn) {
+      dlAllBtn.addEventListener('click', async () => {
+        dlAllBtn.disabled = true;
+        dlAllBtn.textContent = '⏳ Downloading…';
+        for (let i = 0; i < files.length; i++) {
+          await forceDownload(files[i].url, files[i].name, null);
+          // Small gap between downloads so browser doesn't block them
+          if (i < files.length - 1) await new Promise(r => setTimeout(r, 800));
+        }
+        dlAllBtn.disabled = false;
+        dlAllBtn.textContent = '↓ Download All Files';
+      });
+    }
+  }
+
+  function showExpired() {
+    mainContent.innerHTML = `
+      <div class="state">
+        <div class="state-icon">⏰</div>
+        <h2>Link Expired</h2>
+        <p>This share link has expired and the files have been deleted.</p>
+        <a href="/" class="btn-primary">Share New Files</a>
+      </div>`;
+  }
+
+  function showError(title, message) {
+    mainContent.innerHTML = `
+      <div class="state">
+        <div class="state-icon">🔍</div>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${escapeHtml(message)}</p>
+        <a href="/" class="btn-primary">Go Back Home</a>
+      </div>`;
+  }
+
+  loadFiles();
+</script>
+</body>
+</html>
