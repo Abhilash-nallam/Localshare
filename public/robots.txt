@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /uploads/
-Disallow: /api/
-
-Sitemap: https://YOUR-APP-NAME.onrender.com/sitemap.xml
