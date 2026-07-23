@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Localshare — Temporary File Dispatch, No Login</title>
+<meta name="description" content="Send files, get a 6-digit claim code, share it. Files auto-expire — no account, no clutter.">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+
+  :root{
+    --ink:#0a0c11;
+    --panel:#12151d;
+    --panel-2:#171b25;
+    --line:rgba(255,255,255,0.08);
+    --line-soft:rgba(255,255,255,0.05);
+    --text:#eef0f6;
+    --text-dim:#8b93a7;
+    --text-faint:#565d70;
+    --cobalt:#4f6bff;
+    --cobalt-soft:rgba(79,107,255,0.12);
+    --teal:#19c9ae;
+    --teal-soft:rgba(25,201,174,0.12);
+    --brass:#d9ab53;
+    --danger:#ff6178;
+    --radius:16px;
+    --radius-sm:10px;
+    --display:'Outfit',sans-serif;
+    --body:'Inter',sans-serif;
+    --mono:'JetBrains Mono',monospace;
+  }
+
+  html{ scroll-behavior:smooth; }
+  body{
+    font-family:var(--body);
+    background:var(--ink);
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+    line-height:1.5;
+  }
+
+  /* ── AMBIENT BACKDROP — restrained, not confetti ── */
+  .backdrop{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+  .glow{ position:absolute; border-radius:50%; filter:blur(120px); }
+  .glow-a{ width:56vw; height:56vw; top:-22vw; left:-16vw; background:radial-gradient(circle, rgba(79,107,255,0.16), transparent 68%); }
+  .glow-b{ width:46vw; height:46vw; bottom:-20vw; right:-12vw; background:radial-gradient(circle, rgba(25,201,174,0.12), transparent 68%); }
+  .dotgrid{
+    position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.5;
+    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 20%, #000 40%, transparent 85%);
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 20%, #000 40%, transparent 85%);
+  }
+
+  .page{ position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ── NAV ── */
+  .navbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 32px; border-bottom:1px solid var(--line-soft);
+    backdrop-filter:blur(14px);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text); }
+  .brand-mark{
+    width:32px; height:32px; border-radius:9px; flex-shrink:0;
+    background:linear-gradient(135deg, var(--cobalt), var(--teal));
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:0.78rem; color:#0a0c11;
+  }
+  .brand-name{ font-family:var(--mono); font-weight:600; font-size:0.98rem; letter-spacing:0.06em; text-transform:uppercase; }
+  .nav-links{ display:flex; gap:8px; }
+  .nav-link{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 16px; border-radius:50px; text-decoration:none;
+    font-family:var(--body); font-size:0.82rem; font-weight:600; color:var(--text-dim);
+    border:1px solid var(--line); transition:all 0.18s;
+  }
+  .nav-link:hover{ color:var(--text); border-color:rgba(255,255,255,0.22); background:rgba(255,255,255,0.03); }
+
+  /* ── HERO ── */
+  .hero{ text-align:center; padding:56px 20px 8px; }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:var(--mono); font-size:0.7rem; font-weight:600; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--brass); margin-bottom:16px;
+  }
+  .eyebrow::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--brass); box-shadow:0 0 8px var(--brass); }
+  .hero h1{
+    font-family:var(--display); font-weight:700; letter-spacing:-0.02em; line-height:1.15;
+    font-size:clamp(1.7rem, 4vw, 2.7rem); color:var(--text); max-width:760px; margin:0 auto;
+  }
+  .hero-sub{ font-size:0.94rem; color:var(--text-dim); margin-top:14px; max-width:520px; margin-left:auto; margin-right:auto; }
+
+  .stat-row{
+    display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:0;
+    margin:28px auto 0; font-family:var(--mono); font-size:0.74rem; color:var(--text-dim);
+    letter-spacing:0.03em;
+  }
+  .stat{ padding:0 16px; }
+  .stat b{ color:var(--text); font-weight:600; }
+  .stat-div{ width:1px; height:12px; background:var(--line); }
+
+  /* ── CARDS AREA ── */
+  .cards-area{
+    flex:1; display:flex; align-items:flex-start; justify-content:center;
+    gap:20px; padding:40px 24px 32px; flex-wrap:wrap;
+  }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    width:388px; padding:0; display:flex; flex-direction:column;
+    box-shadow:0 24px 60px rgba(0,0,0,0.35);
+    overflow:hidden;
+  }
+
+  .card-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 22px; border-bottom:1px solid var(--line-soft);
+  }
+  .card-head-label{ font-family:var(--mono); font-size:0.68rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; }
+  .card-upload .card-head-label{ color:var(--cobalt); }
+  .card-access .card-head-label{ color:var(--teal); }
+  .card-head h2{ font-family:var(--display); font-size:1.15rem; font-weight:700; margin-top:3px; }
+  .card-head-ico{
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:1.05rem; flex-shrink:0; border:1px solid var(--line);
+  }
+  .card-upload .card-head-ico{ background:var(--cobalt-soft); }
+  .card-access .card-head-ico{ background:var(--teal-soft); }
+
+  .card-body{ padding:20px 22px 0; display:flex; flex-direction:column; gap:14px; }
+
+  /* ── DROPZONE ── */
+  .upload-zone{
+    border:1.5px dashed rgba(255,255,255,0.18); border-radius:12px;
+    background:rgba(255,255,255,0.015); transition:all 0.2s; position:relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over{ border-color:var(--cobalt); background:var(--cobalt-soft); }
+  .upload-zone.shake{ animation:shake 0.45s ease; }
+  @keyframes shake{ 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+
+  .dz-inner{ padding:26px 16px 8px; text-align:center; pointer-events:none; user-select:none; }
+  .dz-icon{ font-size:1.9rem; display:block; margin-bottom:10px; opacity:0.85; }
+  .dz-title{ font-size:0.9rem; font-weight:600; color:var(--text); }
+  .dz-sub{ font-size:0.76rem; color:var(--text-faint); margin-top:4px; }
+
+  .browse-label{
+    display:block; width:calc(100% - 24px); margin:14px 12px 12px;
+    padding:10px; background:rgba(255,255,255,0.04); border:1px solid var(--line);
+    color:var(--text); font-family:var(--body); font-weight:600; font-size:0.83rem;
+    text-align:center; border-radius:9px; cursor:pointer; transition:all 0.18s;
+  }
+  .browse-label:hover{ background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.2); }
+
+  #fileInput{ position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; clip:rect(0,0,0,0); }
+
+  #selectedFiles{ list-style:none; display:flex; flex-direction:column; gap:6px; max-height:132px; overflow-y:auto; }
+  #selectedFiles li{
+    background:rgba(255,255,255,0.03); border:1px solid var(--line-soft); padding:8px 11px;
+    border-radius:9px; display:flex; align-items:center; gap:8px; font-size:0.79rem; color:var(--text);
+    animation:popIn 0.15s ease;
+  }
+  @keyframes popIn{ from{opacity:0; transform:translateY(3px)} to{opacity:1; transform:none} }
+  .fname{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+  .fsize{ font-family:var(--mono); font-size:0.7rem; color:var(--text-faint); flex-shrink:0; }
+  .fremove{ cursor:pointer; color:var(--danger); font-weight:700; font-size:0.85rem; padding:1px 6px; border-radius:5px; flex-shrink:0; transition:background 0.15s; }
+  .fremove:hover{ background:rgba(255,97,120,0.14); }
+
+  /* ── LIMITS BAR (bottom-of-dropzone manifest line) ── */
+  .limits-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 13px; border-radius:9px; background:rgba(255,255,255,0.02);
+    border:1px solid var(--line-soft); font-family:var(--mono); font-size:0.68rem;
+    color:var(--text-faint); letter-spacing:0.02em;
+  }
+  .limits-bar b{ color:var(--text-dim); font-weight:600; }
+  .limits-bar.near-limit{ border-color:rgba(217,171,83,0.4); color:var(--brass); }
+  .limits-bar.near-limit b{ color:var(--brass); }
+  .limits-bar.at-limit{ border-color:rgba(255,97,120,0.4); color:var(--danger); }
+  .limits-bar.at-limit b{ color:var(--danger); }
+
+  .prog-wrap{ display:none; padding:12px 14px; background:rgba(255,255,255,0.03); border:1px solid var(--line-soft); border-radius:11px; }
+  .prog-wrap.show{ display:block; }
+  .prog-track{ height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; margin-bottom:9px; }
+  .prog-fill{ height:100%; border-radius:2px; width:0%; transition:width 0.4s ease; background:linear-gradient(90deg, var(--cobalt), var(--teal)); }
+  .prog-label{ font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-align:center; }
+
+  .flabel{ font-family:var(--mono); font-size:0.68rem; font-weight:600; color:var(--text-faint); letter-spacing:0.1em; text-transform:uppercase; }
+
+  select{
+    width:100%; padding:10px 34px 10px 13px; border-radius:9px;
+    border:1px solid var(--line); font-size:0.85rem;
+    font-family:var(--body); font-weight:500; color:var(--text);
+    background:rgba(255,255,255,0.03) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b93a7' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 13px center;
+    -webkit-appearance:none; appearance:none; outline:none; cursor:pointer; transition:all 0.18s;
+  }
+  select:focus{ border-color:var(--cobalt); background-color:rgba(79,107,255,0.06); }
+  select option{ background:#12151d; color:var(--text); }
+
+  .btn-solid{
+    width:100%; padding:12px; border:none; color:#0a0c11;
+    font-family:var(--body); font-weight:700; font-size:0.9rem;
+    border-radius:10px; cursor:pointer; transition:all 0.18s;
+  }
+  .btn-upload{ background:var(--cobalt); color:#fff; }
+  .btn-upload:hover{ background:#3d59f5; transform:translateY(-1px); }
+  .btn-upload:disabled{ opacity:0.5; cursor:not-allowed; transform:none; }
+  .btn-access{ background:var(--teal); color:#06201c; }
+  .btn-access:hover{ background:#1fe0c3; transform:translateY(-1px); }
+
+  .card-body > .btn-solid:last-of-type{ margin-bottom:20px; }
+
+  /* ── TICKET-STUB RESULT ── */
+  .ticket{
+    display:none; margin-bottom:20px; border:1px solid var(--line); border-radius:12px;
+    overflow:hidden; animation:popIn 0.3s ease; background:rgba(255,255,255,0.02);
+  }
+  .ticket.show{ display:flex; }
+  .ticket-main{ flex:1; padding:16px 16px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .ticket-label{ font-family:var(--mono); font-size:0.66rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--teal); }
+  .url-row{ display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid var(--line-soft); border-radius:8px; padding:8px 11px; }
+  .url-row span{ flex:1; font-size:0.72rem; color:var(--text-dim); word-break:break-all; font-family:var(--mono); }
+  .copy-btn{ padding:6px 13px; font-size:0.72rem; border-radius:7px; background:rgba(255,255,255,0.08); color:var(--text); font-family:var(--body); font-weight:600; border:1px solid var(--line); cursor:pointer; flex-shrink:0; transition:all 0.15s; }
+  .copy-btn:hover{ background:rgba(255,255,255,0.14); }
+  .ticket-perf{
+    width:0; border-left:1.5px dashed rgba(255,255,255,0.18); position:relative; flex-shrink:0;
+  }
+  .ticket-stub{
+    width:128px; flex-shrink:0; padding:16px 10px; text-align:center;
+    background:rgba(217,171,83,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  }
+  .stub-lbl{ font-family:var(--mono); font-size:0.6rem; font-weight:700; color:var(--brass); letter-spacing:0.1em; text-transform:uppercase; }
+  .stub-code{ font-family:var(--mono); font-size:1.5rem; font-weight:700; letter-spacing:0.12em; color:var(--text); }
+  .stub-hint{ font-size:0.62rem; color:var(--text-faint); line-height:1.4; }
+
+  input[type="text"]{
+    width:100%; padding:10px 13px; border-radius:9px;
+    border:1px solid var(--line); font-size:0.87rem;
+    font-family:var(--mono); font-weight:500; color:var(--text);
+    background:rgba(255,255,255,0.03); outline:none; transition:all 0.18s;
+  }
+  input[type="text"]::placeholder{ color:var(--text-faint); font-family:var(--body); }
+  input[type="text"]:focus{ border-color:var(--teal); background:rgba(25,201,174,0.06); }
+
+  .access-note{
+    background:rgba(255,255,255,0.02); border:1px solid var(--line-soft); border-radius:9px;
+    padding:11px 13px; font-size:0.76rem; color:var(--text-dim); line-height:1.6;
+  }
+  .access-note strong{ color:var(--text); }
+
+  #fileList{ display:flex; flex-direction:column; gap:7px; margin-bottom:6px; }
+  .file-dl-item{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:rgba(255,255,255,0.02); border:1px solid var(--line-soft); border-radius:9px; padding:9px 12px;
+    animation:popIn 0.15s ease;
+  }
+  .file-dl-item span{ font-size:0.79rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-weight:500; }
+  .file-dl-item a{
+    background:var(--teal); color:#06201c; text-decoration:none; padding:6px 13px; border-radius:7px;
+    font-size:0.74rem; font-weight:700; flex-shrink:0; transition:opacity 0.18s; display:inline-block;
+  }
+  .file-dl-item a:hover{ opacity:0.85; }
+
+  .error-msg{ color:var(--danger); font-size:0.81rem; text-align:center; padding:12px; background:rgba(255,97,120,0.08); border-radius:9px; border:1px solid rgba(255,97,120,0.22); }
+
+  /* ── ABOUT ── */
+  .below{ position:relative; z-index:1; }
+  .about{ border-top:1px solid var(--line-soft); padding:52px 20px; }
+  .about-title{ text-align:center; font-family:var(--display); font-size:1.4rem; font-weight:700; margin-bottom:6px; }
+  .about-sub{ text-align:center; font-size:0.85rem; color:var(--text-dim); margin-bottom:32px; }
+  .about-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1px; max-width:900px; margin:0 auto; background:var(--line-soft); border:1px solid var(--line-soft); border-radius:14px; overflow:hidden; }
+  .about-card{ background:var(--panel); padding:22px; transition:background 0.2s; }
+  .about-card:hover{ background:var(--panel-2); }
+  .about-card-ico{ font-size:1.4rem; margin-bottom:10px; opacity:0.9; }
+  .about-card h3{ font-size:0.92rem; font-weight:700; color:var(--text); margin-bottom:6px; }
+  .about-card p{ font-size:0.79rem; color:var(--text-dim); line-height:1.65; }
+
+  .site-footer{ border-top:1px solid var(--line-soft); padding:36px 20px 22px; }
+  .footer-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:24px; max-width:900px; margin:0 auto 26px; }
+  .footer-col h4{ font-family:var(--mono); font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); margin-bottom:12px; }
+  .footer-col p{ font-size:0.78rem; color:var(--text-faint); line-height:1.7; }
+  .footer-col ul{ list-style:none; display:flex; flex-direction:column; gap:7px; }
+  .footer-col li{ font-size:0.78rem; color:var(--text-faint); }
+  .footer-col a{ color:var(--text-dim); text-decoration:none; }
+  .footer-col a:hover{ color:var(--text); }
+  .footer-bottom{ border-top:1px solid var(--line-soft); padding-top:18px; text-align:center; font-family:var(--mono); font-size:0.7rem; color:var(--text-faint); max-width:900px; margin:0 auto; }
+  .footer-bottom a{ color:var(--text-dim); }
+
+  ::-webkit-scrollbar{ width:5px; }
+  ::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.14); border-radius:3px; }
+
+  @media (max-width:620px){
+    .card{ width:100%; }
+    .navbar{ padding:14px 16px; }
+    .nav-link span.nl-text{ display:none; }
+    .hero{ padding:36px 16px 4px; }
+    .cards-area{ padding:28px 14px 20px; gap:16px; }
+    .ticket{ flex-direction:column; }
+    .ticket-perf{ display:none; }
+    .ticket-stub{ width:100%; flex-direction:row; justify-content:center; gap:10px; padding:12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="backdrop"><div class="glow glow-a"></div><div class="glow glow-b"></div></div>
+<div class="dotgrid"></div>
+
+<div class="page">
+
+  <nav class="navbar">
+    <a href="/" class="brand">
+      <div class="brand-mark">LS</div>
+      <span class="brand-name">Localshare</span>
+    </a>
+    <div class="nav-links">
+      <a href="ip_locator.html" target="_blank" class="nav-link">🌐 <span class="nl-text">IP Locator</span></a>
+      <a href="https://bitsresourcesr22.free.nf/" target="_blank" class="nav-link">🏠 <span class="nl-text">BITS Resources</span></a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="eyebrow">Temporary file dispatch</div>
+    <h1>Send it. Get a code. It disappears on schedule.</h1>
+    <p class="hero-sub">Drop your files, pick how long the link should live, and hand over the 6-digit code. No account, no residue.</p>
+    <div class="stat-row">
+      <span class="stat">No login</span><span class="stat-div"></span>
+      <span class="stat">Auto-expires</span><span class="stat-div"></span>
+      <span class="stat">Any file type</span><span class="stat-div"></span>
+      <span class="stat">Any device</span>
+    </div>
+  </section>
+
+  <div class="cards-area">
+
+    <!-- SEND CARD -->
+    <div class="card card-upload">
+      <div class="card-head">
+        <div>
+          <div class="card-head-label">Send</div>
+          <h2>Dispatch files</h2>
+        </div>
+        <div class="card-head-ico">📤</div>
+      </div>
+
+      <div class="card-body">
+        <div class="upload-zone" id="uploadArea">
+          <div class="dz-inner">
+            <span class="dz-icon">📁</span>
+            <p class="dz-title">Drag files here, or browse</p>
+            <p class="dz-sub">Files stay private and are removed on expiry</p>
+          </div>
+          <label class="browse-label" for="fileInput">Browse files</label>
+        </div>
+
+        <input type="file" id="fileInput" multiple>
+
+        <ul id="selectedFiles"></ul>
+
+        <div class="limits-bar" id="limitsBar">
+          <span>Up to <b>20 files</b></span>
+          <span><b>100 MB</b> max per file</span>
+        </div>
+
+        <div class="prog-wrap" id="uploadProgress">
+          <div class="prog-track"><div class="prog-fill" id="progressFill"></div></div>
+          <div class="prog-label" id="progressLabel">Uploading…</div>
+        </div>
+
+        <label class="flabel" for="duration">Link stays live for</label>
+        <select id="duration">
+          <option value="24h">24 hours</option>
+          <option value="3d">3 days</option>
+          <option value="7d">7 days</option>
+        </select>
+
+        <button class="btn-solid btn-upload" id="generateBtn">Send &amp; get code</button>
+
+        <div class="ticket" id="resultBox">
+          <div class="ticket-main">
+            <div class="ticket-label">Share link</div>
+            <div class="url-row">
+              <span id="generatedUrl"></span>
+              <button class="copy-btn" id="copyBtn">Copy</button>
+            </div>
+          </div>
+          <div class="ticket-perf"></div>
+          <div class="ticket-stub">
+            <span class="stub-lbl">Claim code</span>
+            <span class="stub-code" id="generatedCode"></span>
+            <span class="stub-hint">Share this to unlock</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECEIVE CARD -->
+    <div class="card card-access">
+      <div class="card-head">
+        <div>
+          <div class="card-head-label">Receive</div>
+          <h2>Claim files</h2>
+        </div>
+        <div class="card-head-ico">📥</div>
+      </div>
+
+      <div class="card-body">
+        <div class="access-note" id="accessNote">
+          <strong>How it works —</strong> paste the link or type the 6-digit code below. Only that exact code unlocks the files, and we don't log who accesses them.
+        </div>
+
+        <label class="flabel" for="accessInput">Link or claim code</label>
+        <input type="text" id="accessInput" placeholder="483920 or paste full link" autocomplete="off" spellcheck="false">
+        <button class="btn-solid btn-access" id="accessBtn">Unlock files</button>
+        <div id="fileList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="below">
+    <section class="about">
+      <p class="about-title">Why Localshare?</p>
+      <p class="about-sub">Built for students, labs, and anyone who wants speed without the account.</p>
+      <div class="about-grid">
+        <div class="about-card"><div class="about-card-ico">🚀</div><h3>Fast by design</h3><p>Upload, get a code, share. No sign-up screens standing between you and the file.</p></div>
+        <div class="about-card"><div class="about-card-ico">🛡️</div><h3>Nothing is kept</h3><p>No login, no email, no long-term storage. We never inspect or share what you send.</p></div>
+        <div class="about-card"><div class="about-card-ico">⏳</div><h3>Expires on its own</h3><p>Pick 24 hours, 3 days, or a week — files and the code both disappear on schedule.</p></div>
+        <div class="about-card"><div class="about-card-ico">🎓</div><h3>Built for labs</h3><p>Handy for college labs, quick group hand-offs, and shared machines you don't own.</p></div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-col"><h4>Localshare</h4><p>Temporary file sharing. No login. Auto-expires.</p></div>
+        <div class="footer-col"><h4>Limits</h4><ul><li>20 files per send</li><li>100 MB per file</li><li>24h – 7d expiry</li></ul></div>
+        <div class="footer-col"><h4>Quick links</h4><ul><li><a href="ip_locator.html" target="_blank">IP Address Locator</a></li><li><a href="https://bitsresourcesr22.free.nf/" target="_blank">BITS Resources</a></li></ul></div>
+        <div class="footer-col"><h4>Use cases</h4><ul><li>Students &amp; colleges</li><li>Office file hand-offs</li><li>Shared lab machines</li></ul></div>
+      </div>
+      <div class="footer-bottom">© 2026 Localshare · Temporary File Sharing Without Login · <a href="mailto:bitsresourcesr22@gmail.com">bitsresourcesr22@gmail.com</a></div>
+    </footer>
+  </div>
+
+</div>
+
+<script>
+/* ═══ LIMITS (mirrors server.js: multer 100MB/file, upload.array("files", 20)) ═══ */
+var MAX_FILES = 20;
+var MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+
+var selectedFiles = [];
+
+document.addEventListener('DOMContentLoaded', function(){
+
+  var fileInput   = document.getElementById('fileInput');
+  var uploadArea  = document.getElementById('uploadArea');
+  var generateBtn = document.getElementById('generateBtn');
+  var copyBtn     = document.getElementById('copyBtn');
+  var accessInput = document.getElementById('accessInput');
+  var accessBtn   = document.getElementById('accessBtn');
+
+  fileInput.addEventListener('change', function(e){
+    var files = Array.from(e.target.files || []);
+    if(files.length > 0) addFiles(files);
+    e.target.value = '';
+  });
+
+  uploadArea.addEventListener('dragenter', function(e){ e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragover',  function(e){ e.preventDefault(); e.stopPropagation(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', function(e){ if(!uploadArea.contains(e.relatedTarget)) uploadArea.classList.remove('drag-over'); });
+  uploadArea.addEventListener('drop', function(e){
+    e.preventDefault(); e.stopPropagation();
+    uploadArea.classList.remove('drag-over');
+    var files = Array.from(e.dataTransfer.files || []);
+    if(files.length > 0) addFiles(files);
+  });
+
+  generateBtn.addEventListener('click', uploadFiles);
+  if(copyBtn) copyBtn.addEventListener('click', copyUrl);
+  if(accessBtn) accessBtn.addEventListener('click', accessFilesHandler);
+  if(accessInput) accessInput.addEventListener('keydown', function(e){ if(e.key==='Enter') accessFilesHandler(); });
+
+  renderLimitsBar();
+});
+
+/* ── ADD FILES, ENFORCING LIMITS CLIENT-SIDE SO USERS FIND OUT INSTANTLY ── */
+function addFiles(newFiles){
+  var added = 0, rejectedSize = [], rejectedCount = 0;
+
+  newFiles.forEach(function(file){
+    if(selectedFiles.length + added >= MAX_FILES){ rejectedCount++; return; }
+    var dup = selectedFiles.some(function(f){ return f.name===file.name && f.size===file.size; });
+    if(dup) return;
+    if(file.size > MAX_FILE_SIZE){ rejectedSize.push(file.name); return; }
+    selectedFiles.push(file); added++;
+  });
+
+  if(added > 0) showToast('✅ '+added+' file'+(added>1?'s':'')+' added','success');
+  if(rejectedSize.length > 0){
+    showToast('❌ '+(rejectedSize.length===1 ? rejectedSize[0]+' is over 100 MB' : rejectedSize.length+' files are over 100 MB')+' — skipped','error');
+  }
+  if(rejectedCount > 0){
+    showToast('❌ Only '+MAX_FILES+' files allowed per send — '+rejectedCount+' skipped','error');
+  }
+
+  renderFileList();
+  renderLimitsBar();
+}
+
+function renderFileList(){
+  var list = document.getElementById('selectedFiles');
+  if(!list) return;
+  list.innerHTML = '';
+  selectedFiles.forEach(function(file, idx){
+    var li = document.createElement('li');
+    li.innerHTML =
+      '<span class="fname" title="'+escHtml(file.name)+'">'+getIcon(file.name)+' '+truncate(escHtml(file.name),30)+'</span>'+
+      '<span class="fsize">'+formatBytes(file.size)+'</span>'+
+      '<span class="fremove" title="Remove">✕</span>';
+    li.querySelector('.fremove').addEventListener('click', function(){ removeFile(idx); });
+    list.appendChild(li);
+  });
+}
+
+function renderLimitsBar(){
+  var bar = document.getElementById('limitsBar');
+  if(!bar) return;
+  var count = selectedFiles.length;
+  var totalBytes = selectedFiles.reduce(function(sum,f){ return sum+f.size; }, 0);
+
+  bar.classList.remove('near-limit','at-limit');
+
+  if(count === 0){
+    bar.innerHTML = '<span>Up to <b>'+MAX_FILES+' files</b></span><span><b>100 MB</b> max per file</span>';
+    return;
+  }
+
+  bar.innerHTML = '<span><b>'+count+' / '+MAX_FILES+'</b> files</span><span><b>'+formatBytes(totalBytes)+'</b> total &middot; 100 MB max per file</span>';
+
+  if(count >= MAX_FILES) bar.classList.add('at-limit');
+  else if(count >= MAX_FILES - 3) bar.classList.add('near-limit');
+}
+
+function removeFile(idx){ selectedFiles.splice(idx,1); renderFileList(); renderLimitsBar(); }
+
+async function uploadFiles(){
+  if(selectedFiles.length === 0){
+    var area = document.getElementById('uploadArea');
+    if(area){ area.classList.add('shake'); setTimeout(function(){ area.classList.remove('shake'); },600); }
+    showToast('Please add at least one file!','error'); return;
+  }
+
+  var btn=document.getElementById('generateBtn'), resultBox=document.getElementById('resultBox');
+  var progWrap=document.getElementById('uploadProgress'), progFill=document.getElementById('progressFill'), progLabel=document.getElementById('progressLabel');
+
+  btn.disabled=true; btn.textContent='Uploading…';
+  if(resultBox) resultBox.classList.remove('show');
+  if(progWrap) progWrap.classList.add('show');
+  if(progFill) progFill.style.width='0%';
+  if(progLabel) progLabel.textContent='Preparing upload…';
+
+  var fakeP=0;
+  var iv=setInterval(function(){
+    fakeP=Math.min(fakeP+Math.random()*6,88);
+    if(progFill) progFill.style.width=fakeP+'%';
+    if(progLabel) progLabel.textContent='Uploading… '+Math.round(fakeP)+'%';
+  },300);
+
+  var fd=new FormData();
+  selectedFiles.forEach(function(f){ fd.append('files',f); });
+  fd.append('duration',document.getElementById('duration').value);
+
+  try{
+    var res=await fetch('/upload',{method:'POST',body:fd});
+    clearInterval(iv);
+    if(!res.ok){ var msg='Server error ('+res.status+')'; try{var d=await res.json();msg=d.error||msg;}catch(e){} throw new Error(msg); }
+    var data=await res.json();
+    if(data.error) throw new Error(data.error);
+
+    if(progFill) progFill.style.width='100%';
+    if(progLabel) progLabel.textContent='Upload complete';
+
+    var urlEl=document.getElementById('generatedUrl'), codeEl=document.getElementById('generatedCode');
+    if(urlEl) urlEl.textContent=data.url;
+    if(codeEl) codeEl.textContent=data.code;
+
+    setTimeout(function(){
+      if(progWrap) progWrap.classList.remove('show');
+      if(resultBox) resultBox.classList.add('show');
+    },600);
+
+    showToast('✅ Link generated!','success');
+    selectedFiles=[];
+    renderFileList();
+    renderLimitsBar();
+
+  }catch(err){
+    clearInterval(iv);
+    if(progWrap) progWrap.classList.remove('show');
+    showToast('❌ '+(err.message||'Upload failed. Try again.'),'error');
+  }finally{
+    btn.disabled=false; btn.textContent='Send & get code';
+  }
+}
+
+function copyUrl(){
+  var urlEl=document.getElementById('generatedUrl');
+  var text=urlEl?urlEl.textContent.trim():'';
+  if(!text){ showToast('Generate a link first!','error'); return; }
+  var btn=document.getElementById('copyBtn');
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(function(){ flashCopied(btn); }).catch(function(){ legacyCopy(text,btn); });
+  } else { legacyCopy(text,btn); }
+}
+
+function legacyCopy(text,btn){
+  var ta=document.createElement('textarea');
+  ta.value=text; ta.style.cssText='position:fixed;opacity:0;top:0;left:0;';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); flashCopied(btn); }
+  catch(e){ showToast('Copy failed — please copy manually','error'); }
+  document.body.removeChild(ta);
+}
+
+function flashCopied(btn){
+  if(!btn) return;
+  var orig=btn.textContent; btn.textContent='Copied'; btn.style.background='#19c9ae'; btn.style.color='#06201c';
+  setTimeout(function(){ btn.textContent=orig; btn.style.background=''; btn.style.color=''; },2000);
+}
+
+async function accessFilesHandler(){
+  var inputEl=document.getElementById('accessInput'), listEl=document.getElementById('fileList');
+  if(!inputEl||!listEl) return;
+  var raw=inputEl.value.trim();
+  listEl.innerHTML='';
+  if(!raw){ listEl.innerHTML='<div class="error-msg">Enter a link or 6-digit code.</div>'; return; }
+
+  var code, urlMatch=raw.match(/\/access\/(\d{6})/);
+  if(urlMatch){ code=urlMatch[1]; }
+  else if(/^\d{6}$/.test(raw)){ code=raw; }
+  else{ listEl.innerHTML='<div class="error-msg">Enter the full share link or a 6-digit code.</div>'; return; }
+
+  listEl.innerHTML='<p style="color:#8b93a7;font-size:0.83rem;text-align:center;padding:12px">Fetching files…</p>';
+
+  try{
+    var res=await fetch('/api/access/'+code), data=await res.json();
+    listEl.innerHTML='';
+    if(data.error){ listEl.innerHTML='<div class="error-msg">'+escHtml(data.error)+'</div>'; return; }
+
+    data.files.forEach(function(file){
+      var item=document.createElement('div'); item.className='file-dl-item';
+      item.innerHTML='<span title="'+escHtml(file.name)+'">'+getIcon(file.name)+' '+escHtml(file.name)+(file.size?' <small style="opacity:.55">('+formatBytes(file.size)+')</small>':'')+'</span><a href="'+escHtml(file.url)+'" download="'+escHtml(file.name)+'">Download</a>';
+      listEl.appendChild(item);
+    });
+
+    if(data.files.length>1){
+      var dlAll=document.createElement('button');
+      dlAll.textContent='Download all';
+      dlAll.style.cssText='margin-top:2px;width:100%;padding:10px;border:1px solid rgba(255,255,255,0.08);border-radius:9px;background:rgba(255,255,255,0.03);color:#eef0f6;font-family:Inter,sans-serif;font-weight:600;font-size:0.82rem;cursor:pointer;';
+      dlAll.addEventListener('click',function(){
+        data.files.forEach(function(f,i){ setTimeout(function(){ var a=document.createElement('a'); a.href=f.url; a.download=f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); },i*500); });
+      });
+      listEl.appendChild(dlAll);
+    }
+
+  }catch(err){ listEl.innerHTML='<div class="error-msg">Could not reach server. Please try again.</div>'; console.error(err); }
+}
+
+function getIcon(name){
+  var ext=(name||'').split('.').pop().toLowerCase();
+  var m={pdf:'📄',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp4:'🎬',mov:'🎬',avi:'🎬',mp3:'🎵',wav:'🎵',zip:'🗜️',rar:'🗜️','7z':'🗜️',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',txt:'📃',js:'💻',ts:'💻',html:'🌐',css:'🎨',py:'🐍'};
+  return m[ext]||'📁';
+}
+function formatBytes(b){ if(!b)return'0 B'; if(b<1024)return b+' B'; if(b<1048576)return(b/1024).toFixed(1)+' KB'; return(b/1048576).toFixed(1)+' MB'; }
+function truncate(s,max){ return s.length>max?s.slice(0,max-1)+'…':s; }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function showToast(msg,type){
+  var old=document.getElementById('ls-toast'); if(old)old.remove();
+  var t=document.createElement('div'); t.id='ls-toast'; t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(type==='error'?'#ff6178':'#19c9ae')+';color:'+(type==='error'?'#fff':'#06201c')+';padding:10px 22px;border-radius:9px;font-size:0.85rem;font-weight:600;z-index:9999;font-family:Inter,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,0.4);white-space:nowrap;';
+  document.body.appendChild(t); setTimeout(function(){t.remove();},3000);
+}
+</script>
+
+</body>
+</html>
